@@ -93,3 +93,134 @@ exemples:
       group by c.nom, c.departement, c.population
       order by nb_sites desc
       limit 10
+
+  - question: Nombre de sites 4G mis en service par opérateur et par année depuis 2020
+    tables: [fact_station, dim_date]
+    sql: |
+      with premiere_4g as (
+          select site_id, operateur_id, min(date_mise_service) as date_4g
+          from fact_station
+          where techno = '4G' and est_actif
+          group by site_id, operateur_id
+      )
+      select d.annee, p.operateur_id, count(*) as nb_sites
+      from premiere_4g p
+      join dim_date d on d.date = p.date_4g
+      where d.annee >= 2020
+        and p.operateur_id in ('ORANGE', 'SFR', 'BOUYGUES', 'FREE')
+      group by d.annee, p.operateur_id
+      order by d.annee, p.operateur_id
+
+  - question: Quels sont les 5 départements avec le plus de sites en panne en moyenne par jour ce mois-ci ?
+    tables: [fact_indispo_site, dim_departement]
+    sql: |
+      select d.departement, d.nom, count(*) / count(distinct f.date) as nb_sites_moyen_par_jour
+      from fact_indispo_site f
+      join dim_departement d using (departement)
+      where f.date >= date_trunc('month', current_date)
+      group by d.departement, d.nom
+      order by nb_sites_moyen_par_jour desc
+      limit 5
+
+  - question: Evolution quotidienne du nombre de sites Bouygues Telecom sans voix depuis 2 semaines
+    tables: [fact_indispo_site]
+    sql: |
+      select date, count(*) as nb_sites_voix_hs
+      from fact_indispo_site
+      where operateur_id = 'BOUYGUES'
+        and voix_hs
+        and date >= current_date - interval 14 day
+      group by date
+      order by date
+
+  - question: Part des pannes dues à la maintenance par opérateur depuis le début du mois dernier
+    tables: [fact_indispo_site]
+    sql: |
+      select operateur_id,
+             round(100.0 * count(*) filter (where raison = 'maintenance') / count(*), 1) as pct_maintenance
+      from fact_indispo_site
+      where date >= date_trunc('month', current_date) - interval 1 month
+      group by operateur_id
+      order by pct_maintenance desc
+
+  - question: Combien de sites ont la data 5G en panne mais la 4G qui fonctionne aujourd'hui, par opérateur ?
+    tables: [fact_indispo]
+    sql: |
+      select operateur_id, count(distinct site_id) as nb_sites
+      from fact_indispo f5
+      where f5.date = (select max(date) from fact_indispo)
+        and f5.service = 'data' and f5.techno = '5G' and f5.est_hs
+        and exists (
+            select 1 from fact_indispo f4
+            where f4.date = f5.date and f4.site_id = f5.site_id
+              and f4.service = 'data' and f4.techno = '4G' and not f4.est_hs
+        )
+      group by operateur_id
+      order by nb_sites desc
+
+  - question: Nombre de sites en panne par région et par opérateur hier
+    tables: [fact_indispo_site, dim_departement]
+    sql: |
+      select d.region, f.operateur_id, count(*) as nb_sites
+      from fact_indispo_site f
+      join dim_departement d using (departement)
+      where f.date = (select max(date) from fact_indispo_site)
+      group by d.region, f.operateur_id
+      order by d.region, nb_sites desc
+
+  - question: Y a-t-il plus de pannes le week-end qu'en semaine ?
+    tables: [fact_indispo_site, dim_date]
+    sql: |
+      select dd.est_weekend, count(*) / count(distinct f.date) as nb_sites_moyen_par_jour
+      from fact_indispo_site f
+      join dim_date dd using (date)
+      group by dd.est_weekend
+      order by dd.est_weekend
+
+  - question: Combien de sites 5G actifs dans chaque département d'Occitanie ?
+    tables: [dim_site, dim_departement]
+    sql: |
+      select d.departement, d.nom, count(*) as nb_sites_5g
+      from dim_site s
+      join dim_departement d using (departement)
+      where s.a_5g and d.region = 'Occitanie'
+      group by d.departement, d.nom
+      order by nb_sites_5g desc
+
+  - question: Combien de sites par opérateur en outre-mer ?
+    tables: [dim_site, dim_operateur]
+    sql: |
+      select o.nom, count(*) as nb_sites
+      from dim_site s
+      join dim_operateur o using (operateur_id)
+      where s.source = 'anfr' and (s.departement like '97%' or s.departement like '98%')
+      group by o.nom
+      order by nb_sites desc
+
+  - question: Hauteur moyenne des supports des sites 5G par opérateur
+    tables: [dim_site]
+    sql: |
+      select operateur_id, round(avg(hauteur_m), 1) as hauteur_moyenne_m, count(*) as nb_sites
+      from dim_site
+      where a_5g and operateur_id in ('ORANGE', 'SFR', 'BOUYGUES', 'FREE')
+      group by operateur_id
+      order by hauteur_moyenne_m desc
+
+  - question: Combien de sites en panne dans le département 33 pendant plus de 3 jours consécutifs cette semaine ?
+    tables: [fact_indispo_site]
+    sql: |
+      select count(distinct site_id) as nb_sites
+      from fact_indispo_site
+      where departement = '33'
+        and date >= date_trunc('week', current_date)
+        and nb_jours_depuis_debut > 3
+
+  - question: Nombre de sites en panne par opérateur et par semaine depuis un mois
+    tables: [fact_indispo_site, dim_date]
+    sql: |
+      select dd.semaine_iso, f.operateur_id, count(distinct f.site_id) as nb_sites
+      from fact_indispo_site f
+      join dim_date dd using (date)
+      where f.date >= current_date - interval 1 month
+      group by dd.semaine_iso, f.operateur_id
+      order by dd.semaine_iso, f.operateur_id

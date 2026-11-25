@@ -7,7 +7,8 @@ termes:
 
   - nom: panne
     tables: [fact_indispo_site]
-    mots: [panne, hs, hors service, indisponible, indisponibilite, coupure, coupe, down, incident, ne fonctionne]
+    mots: [panne, hs, hors service, indisponible, indisponibilite, coupure, coupe, down, incident, ne fonctionne,
+           sans voix, sans data, sans internet, sans reseau, sans service]
     definition: Un site est en panne un jour donné s'il figure dans fact_indispo_site ce jour-là.
     sql: "fact_indispo_site (un site par jour) ; par techno : fact_indispo where est_hs"
 
@@ -47,7 +48,8 @@ termes:
     sql: "join dim_commune c using (code_insee) ; pour Paris : c.nom = 'Paris' or c.code_commune_parent = '75056'"
 
   - nom: dates relatives
-    mots: [hier, aujourd, semaine derniere, cette semaine, mois dernier, ce mois, depuis le, derniers jours, recemment]
+    mots: [hier, aujourd, semaine derniere, cette semaine, mois dernier, ce mois, depuis le, derniers jours, recemment,
+           depuis, quotidien, quotidienne, evolution, semaines, actuellement]
     definition: >
       Les relevés vont jusqu'à hier. "Aujourd'hui" ou "actuellement" = dernier relevé disponible.
       "La semaine dernière" = du lundi au dimanche de la semaine précédente.
@@ -85,9 +87,13 @@ termes:
     sql: "fact_station.bande_mhz"
 
   - nom: metropole et outre-mer
-    mots: [metropole, metropolitaine, outre-mer, dom, drom, antilles, reunion, guyane, mayotte]
-    definition: Outre-mer = départements dont le code commence par 97 ou 98.
-    sql: "metropole : departement not like '97%' and departement not like '98%'"
+    mots: [metropole, metropolitaine, outre-mer, dom, drom, antilles, reunion, guyane, mayotte,
+           guadeloupe, martinique, saint-martin, saint-barthelemy, polynesie, caledonie]
+    definition: >
+      Outre-mer = départements dont le code commence par 97 ou 98. Opérateurs propres : aux Antilles et en
+      Guyane (971, 972, 973, 977, 978) Free est 'FREE_CARAIBES' ; à La Réunion et Mayotte (974, 976) Free est 'FREE'.
+      Les indisponibilités Arcep concernent presque uniquement la métropole ; le parc d'outre-mer est dans dim_site.
+    sql: "metropole : departement not like '97%' and departement not like '98%' ; Free aux Antilles : operateur_id = 'FREE_CARAIBES'"
 
   - nom: calendrier
     tables: [dim_date]

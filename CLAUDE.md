@@ -31,7 +31,11 @@ Projet portfolio d'un étudiant en M2 IA, orienté poste de Data Analyst / ingé
   qui porte une colonne mal préfixée), reconnaissance des départements et régions (`prompt.resolve_places`).
 - Ollama installé (`%LOCALAPPDATA%\Programs\Ollama\ollama.exe`), modèle qwen2.5-coder:3b téléchargé.
   Latence observée : 20 à 60 s par question sur CPU.
-- Prochaine étape : RAG (étape 6) : sélection des tables et exemples few-shot par similarité.
+- Étape 6 faite : `netquery/retrieval.py` (BM25 + embeddings `paraphrase-multilingual` via Ollama, RRF,
+  cache `data/cache/`, `EMBED_MODEL=off` pour BM25 seul ; les tests le forcent). `prompt.rag_select` :
+  tables par règles (repli `dim_site` si ni panne ni date), exemples classés structure puis similarité.
+  `prompt.operator_hints` : codes opérateurs d'outre-mer lus dans dim_site. 20 exemples.
+- Prochaine étape : cloud et coûts (étape 7, BigQuery) ou évaluation (étape 8, jeu de questions séparé des exemples).
 
 ## Conventions
 

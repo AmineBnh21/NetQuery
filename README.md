@@ -106,6 +106,7 @@ netquery/
 ├── netquery/
 │   ├── schema.py          # chargement, validation contre la base, rendu compact pour le prompt
 │   ├── prompt.py          # choix des tables, glossaire et exemples envoyés au LLM
+│   ├── retrieval.py       # recherche hybride des exemples (BM25 + embeddings, fusion RRF)
 │   ├── llm.py             # client générique (API compatible OpenAI, Ollama par défaut)
 │   ├── sql_guard.py       # garde-fous : SELECT seul, tables autorisées, LIMIT, lecture seule, timeout
 │   └── pipeline.py        # question -> SQL -> résultat
@@ -135,6 +136,7 @@ Modèle de langage local avec [Ollama](https://ollama.com) :
 ```powershell
 winget install Ollama.Ollama
 ollama pull qwen2.5-coder:3b
+ollama pull paraphrase-multilingual   # embeddings multilingues pour la recherche d'exemples
 copy .env.example .env   # adapter si besoin (autre modèle, autre fournisseur compatible OpenAI)
 ```
 
@@ -205,8 +207,28 @@ pour 20 à 60 s par question. Deux mécanismes ont fait la différence :
 - **Auto-correction guidée** : en cas d'erreur, la requête et le message de DuckDB sont renvoyés au modèle
   (2 essais au maximum), avec une indication sur la table qui contient la colonne fautive.
 
-Limite connue : le modèle oublie parfois un regroupement demandé (« par opérateur ») quand un exemple
-proche ne l'a pas ; à traiter avec la sélection d'exemples (étape 6) et à mesurer à l'étape 8.
+### Sélection des exemples (RAG)
+
+Les exemples few-shot sont choisis parmi `semantic/exemples.yaml` par une recherche hybride :
+BM25 sur les mots (robuste aux codes comme `5G` ou `SFR`) et similarité d'embeddings
+(`paraphrase-multilingual`, servi par Ollama), fusionnés par Reciprocal Rank Fusion.
+Sans serveur d'embeddings, la recherche se replie sur BM25 seul.
+
+Ce qui a été mesuré en chemin :
+
+- En leave-one-out sur les 20 exemples, le plus proche voisin a la même table principale dans 13 cas sur 20
+  avec les embeddings, contre 10 avec BM25 seul.
+- Mais classer les exemples **uniquement** par similarité a fait régresser le modèle : il recopie un exemple
+  proche en mots mais de structure différente (il oublie alors un regroupement ou un filtre).
+  Les exemples sont donc classés d'abord par structure (mêmes tables que celles retenues), puis par similarité.
+- Le choix des tables reste fondé sur des règles (glossaire), plus fiables ici que la similarité ;
+  une question sans notion de panne, de déploiement ni de date porte sur le parc (`dim_site`).
+- Les opérateurs sont reconnus selon le lieu : en Guadeloupe, « Free » est `FREE_CARAIBES`.
+
+Sur un jeu d'essai de 8 questions (dont les 4 exemples ci-dessous), la version avec RAG répond juste
+aux 8, contre 6 pour la sélection d'exemples par recouvrement de tables seule, pour 5 à 40 s par question
+sur CPU. Ce jeu est petit et a servi à mettre au point le système : la mesure fiable viendra de l'étape 8,
+sur des questions qui ne servent pas d'exemples.
 
 Le schéma complet représente environ 1 900 tokens, deux tables environ 360 : avec un modèle local
 limité à 4 096 tokens de contexte, seules les tables utiles à la question sont envoyées.
@@ -224,7 +246,7 @@ python -c "import duckdb; print(duckdb.connect('data/netquery.duckdb').sql('SHOW
 - [x] **3. Schéma enrichi** : description de chaque table et colonne, valeurs possibles, clés de jointure, colonnes de partition, glossaire métier (YAML).
 - [x] **4. MVP text-to-SQL** : prompt + génération + exécution sur DuckDB, interface Streamlit.
 - [x] **5. Garde-fous** : validation sqlglot, lecture seule, `LIMIT`, timeout, boucle d'auto-correction.
-- [ ] **6. RAG** : sélection des tables pertinentes, exemples few-shot dynamiques.
+- [x] **6. RAG** : sélection des tables pertinentes, exemples few-shot dynamiques.
 - [ ] **7. Cloud et coûts** : chargement dans BigQuery (partition par date, clustering par opérateur et département), dry run, seuil de coût, routage vers les tables `agg_`, cache du SQL normalisé, cache sémantique.
 - [ ] **8. Évaluation** : 60 à 80 questions avec le SQL attendu ; comparaison version naïve / version optimisée.
 - [ ] **9. Bonus** : questions de suivi, demande de clarification si la question est ambiguë, carte des résultats.

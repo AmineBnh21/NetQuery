@@ -36,3 +36,20 @@ def test_departement_reconnu_sans_dimension():
     pr = build_prompt("Combien de sites Orange en panne hier dans le Nord ?")
     assert pr.tables == ["fact_indispo_site"]
     assert "departement = '59'" in pr.messages[-1]["content"]
+
+
+def test_question_sur_le_parc():
+    # ni panne, ni déploiement, ni date : le parc de sites
+    assert select_tables("Combien de sites Free en Guadeloupe ?") == ["dim_site"]
+
+
+def test_operateur_outre_mer():
+    pr = build_prompt("Combien de sites Free en Guadeloupe ?")
+    assert "'FREE_CARAIBES'" in pr.messages[-1]["content"]
+
+
+def test_exemples_de_meme_structure_en_premier():
+    pr = build_prompt("Combien de sites ont reçu leur première antenne 5G par opérateur chaque trimestre de 2025 ?")
+    from netquery.prompt import load_examples
+    by_q = {e.question: e for e in load_examples()}
+    assert all(set(by_q[q].tables) == set(pr.tables) for q in pr.examples)

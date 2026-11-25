@@ -106,10 +106,41 @@ def resolve_places(question: str) -> list[Place]:
     return found
 
 
+OPERATOR_WORDS = {"orange": "ORANGE", "sfr": "SFR", "bouygues": "BOUYGUES", "bytel": "BOUYGUES", "free": "FREE"}
+
+
+def operator_hints(question: str, places: list[Place]) -> list[str]:
+    """En outre-mer les opérateurs ont d'autres codes (Free aux Antilles = FREE_CARAIBES) :
+    on lit dans dim_site les opérateurs présents dans les départements cités."""
+    deps = [p.code for p in places if p.kind == "departement" and p.code[:2] in ("97", "98")]
+    if not deps:
+        return []
+    from netquery.sql_guard import readonly_connection
+
+    try:
+        con = readonly_connection()
+        present = [r[0] for r in con.execute(
+            "select distinct operateur_id from dim_site where departement in ? order by 1", [deps]).fetchall()]
+        con.close()
+    except Exception:  # noqa: BLE001
+        return []
+    hints = []
+    words = set(_key(question).split())
+    for word, code in OPERATOR_WORDS.items():
+        if word in words:
+            local = [op for op in present if op.startswith(code)]
+            if local and local != [code]:
+                hints.append(f"{word.capitalize()} dans ce département = operateur_id {' ou '.join(repr(o) for o in local)}")
+    hints.append(f"Opérateurs présents : {', '.join(present)}")
+    return hints
+
+
 # --------------------------------------------------------------------------- choix des tables
 
-def select_tables(question: str, terms: list[Term] | None = None) -> list[str]:
-    """Règles simples à partir du glossaire (sera remplacé par une recherche sémantique à l'étape 6)."""
+def select_tables(question: str, terms: list[Term] | None = None,
+                  fallback: list[str] | None = None) -> list[str]:
+    """Règles à partir du glossaire. Si aucune règle ne désigne de table principale (fait ou dim_site),
+    on prend `fallback` (tables de l'exemple le plus proche, voir rag_tables), sinon fact_indispo_site."""
     terms = glossary_for(question) if terms is None else terms
     names = {t.nom for t in terms}
     tables: list[str] = []
@@ -130,15 +161,52 @@ def select_tables(question: str, terms: list[Term] | None = None) -> list[str]:
         # garder fact_indispo_site seulement si on a besoin de ses colonnes propres
         if not names & {"anciennete d'une panne", "incident ou maintenance"}:
             tables.remove("fact_indispo_site")
-    if not any(t.startswith("fact_") or t.startswith("agg_") for t in tables):
-        tables.append(DEFAULT_FACT)
+    if not any(t.startswith(("fact_", "agg_")) or t == "dim_site" for t in tables):
+        if "dates relatives" not in names and "calendrier" not in names:
+            # ni panne, ni déploiement, ni date : la question porte sur le parc de sites
+            tables.append("dim_site")
+        else:
+            tables += fallback or [DEFAULT_FACT]
 
     # faits d'abord, puis dimensions (ordre stable pour le cache du prompt)
     return sorted(dict.fromkeys(tables), key=lambda t: (not t.startswith("fact_"), t))
 
 
+def _main_tables(tables) -> list[str]:
+    return [t for t in tables if t.startswith(("fact_", "agg_")) or t == "dim_site"]
+
+
+def similar_examples(question: str, k: int = 6, exclude: set[int] | None = None) -> list[tuple[int, Example]]:
+    """Exemples les plus proches de la question (recherche hybride BM25 + embeddings)."""
+    from netquery.retrieval import example_index
+
+    examples = load_examples()
+    return [(h.index, examples[h.index]) for h in example_index().search(question, k=k, exclude=exclude)]
+
+
+def rag_select(question: str, terms: list[Term], k: int = 2,
+               exclude: set[int] | None = None) -> tuple[list[str], list[Example]]:
+    """Tables et exemples few-shot.
+    Tables : règles du glossaire, avec repli sur la table principale des exemples proches.
+    Exemples : d'abord la structure (mêmes tables exactement, puis un sous-ensemble), ensuite la
+    similarité de la question. Mesuré : la similarité seule choisit des exemples proches en mots
+    mais de structure différente, que le petit modèle recopie."""
+    n = len(load_examples())
+    neighbours = [ex for _, ex in similar_examples(question, k=n, exclude=exclude)]  # tous, classés
+    fallback = next((_main_tables(ex.tables) for ex in neighbours if _main_tables(ex.tables)), None)
+    tables = select_tables(question, terms, fallback=fallback)
+    chosen = set(tables)
+
+    def structure(ex: Example) -> int:
+        ts = set(ex.tables)
+        return 0 if ts == chosen else 1 if ts <= chosen else 2 if ts & set(_main_tables(chosen)) else 3
+
+    ranked = sorted(neighbours, key=structure)  # tri stable : l'ordre de similarité départage
+    return tables, [ex for ex in ranked if structure(ex) < 3][:k]
+
+
 def pick_examples(tables: list[str], k: int = 2) -> list[Example]:
-    """Exemples dont les tables recouvrent le plus celles retenues (simple, avant le RAG)."""
+    """Ancienne sélection par recouvrement des tables (sans RAG), gardée pour comparer à l'étape 8."""
     chosen = set(tables)
     scored = []
     for i, ex in enumerate(load_examples()):
@@ -181,20 +249,24 @@ def data_context(today: dt.date | None = None) -> str:
     return line
 
 
-def build_prompt(question: str, today: dt.date | None = None) -> Prompt:
+def build_prompt(question: str, today: dt.date | None = None, use_rag: bool = True) -> Prompt:
     terms = glossary_for(question)
     places = resolve_places(question)
     if places and all(p.kind == "departement" for p in places):
         # les faits portent déjà le code département : inutile d'envoyer dim_departement
         terms = [t for t in terms if t.nom != "departement et region"]
-    tables = select_tables(question, terms)
-    examples = pick_examples(tables)
+    if use_rag:
+        tables, examples = rag_select(question, terms)
+    else:
+        tables = select_tables(question, terms)
+        examples = pick_examples(tables)
 
     parts = ["Schéma :", render_schema(tables)]
     if terms:
         parts += ["", "Glossaire :", render_glossary(terms)]
     if places:
         parts += ["", "Lieux reconnus dans la question :"] + [f"- {p.hint()}" for p in places]
+        parts += [f"- {h}" for h in operator_hints(question, places)]
     if examples:
         parts += ["", "Exemples :"]
         for ex in examples:
