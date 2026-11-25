@@ -20,7 +20,10 @@ Projet portfolio d'un étudiant en M2 IA, orienté poste de Data Analyst / ingé
 - `raw_anfr_stations` est une vue vers la table ANFR la plus récente (son nom contient la date de l'archive).
 - Pièges connus : 5G ANFR toujours « Techniquement opérationnel » (utiliser `est_actif`) ;
   `fact_indispo` non additif entre technos.
-- Prochaine étape : schéma enrichi (étape 3 du README).
+- Étape 3 faite : `semantic/schema.yaml` (tables, colonnes, valeurs, jointures, partitions) et
+  `semantic/glossaire.yaml` (mots-clés -> définition + indice SQL). `netquery/schema.py` : `render_schema(tables)`,
+  `glossary_for(question)`, `check()`. Après toute modification du modèle SQL : `python -m netquery.schema --check`.
+- Prochaine étape : MVP text-to-SQL (étape 4 du README), avec `netquery/llm.py` générique (voir section LLM).
 
 ## Conventions
 

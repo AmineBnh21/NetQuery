@@ -99,6 +99,11 @@ netquery/
 ├── sql/
 │   ├── staging/           # stg_ : typage, nettoyage, normalisation
 │   └── model/             # dim_, fact_, agg_
+├── semantic/
+│   ├── schema.yaml        # description des tables et colonnes, valeurs, jointures, partitions
+│   └── glossaire.yaml     # vocabulaire métier relié aux tables et colonnes
+├── netquery/
+│   └── schema.py          # chargement, validation contre la base, rendu compact pour le prompt
 └── data/                  # créé par le script, ignoré par git
     ├── raw/               # fichiers bruts téléchargés (cache)
     ├── lake/indispo/      # Parquet partitionné : date=AAAA-MM-JJ/part.parquet
@@ -154,6 +159,19 @@ python scripts/transform.py
 python scripts/transform.py --checks
 ```
 
+Schéma enrichi (ce que voit le LLM) :
+
+```powershell
+# vérifier que les YAML correspondent à la base (tables, colonnes, valeurs possibles, glossaire)
+python -m netquery.schema --check
+
+# afficher le schéma envoyé au LLM pour quelques tables, et le glossaire retenu pour une question
+python -m netquery.schema --render fact_indispo dim_departement --question "sites SFR en panne 4G dans le Rhône"
+```
+
+Le schéma complet représente environ 1 900 tokens, deux tables environ 360 : avec un modèle local
+limité à 4 096 tokens de contexte, seules les tables utiles à la question sont envoyées.
+
 Explorer la base :
 
 ```powershell
@@ -164,7 +182,7 @@ python -c "import duckdb; print(duckdb.connect('data/netquery.duckdb').sql('SHOW
 
 - [x] **1. Ingestion** : sites indisponibles (Parquet partitionné) et stations ANFR dans DuckDB, profil du schéma.
 - [x] **2. Staging et modèle** : typage, normalisation des opérateurs, passage au format long (service, techno, état), tables `dim_`, `fact_`, `agg_`.
-- [ ] **3. Schéma enrichi** : description de chaque table et colonne, valeurs possibles, clés de jointure, colonnes de partition, glossaire métier (YAML).
+- [x] **3. Schéma enrichi** : description de chaque table et colonne, valeurs possibles, clés de jointure, colonnes de partition, glossaire métier (YAML).
 - [ ] **4. MVP text-to-SQL** : prompt + génération + exécution sur DuckDB, interface Streamlit.
 - [ ] **5. Garde-fous** : validation sqlglot, lecture seule, `LIMIT`, timeout, boucle d'auto-correction.
 - [ ] **6. RAG** : sélection des tables pertinentes, exemples few-shot dynamiques.

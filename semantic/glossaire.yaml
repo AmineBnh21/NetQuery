@@ -1,0 +1,82 @@
+# Glossaire métier : relie le vocabulaire des questions aux tables et colonnes.
+# "mots" sert à retrouver les entrées pertinentes pour une question (sans accents, minuscules).
+# Seules les entrées qui correspondent à la question sont envoyées au LLM.
+
+termes:
+
+  - nom: panne
+    mots: [panne, hs, hors service, indisponible, indisponibilite, coupure, coupe, down, incident, ne fonctionne]
+    definition: Un site est en panne un jour donné s'il figure dans fact_indispo_site ce jour-là.
+    sql: "fact_indispo_site (un site par jour) ; par techno : fact_indispo where est_hs"
+
+  - nom: compter des sites sur une période
+    mots: [combien de sites, nombre de sites, sites, semaine, mois, periode, depuis]
+    definition: >
+      Un site en panne plusieurs jours apparaît une fois par jour. "Combien de sites" sur une période
+      = sites distincts ; "volume d'indisponibilité" = sites-jours (somme sur les jours).
+    sql: "count(distinct site_id) pour des sites ; count(*) ou sum(nb_sites_indispo) pour des sites-jours"
+
+  - nom: operateurs
+    mots: [orange, sfr, bouygues, bytel, free, operateur]
+    definition: Codes opérateur dans toutes les tables.
+    sql: "operateur_id in ('ORANGE', 'SFR', 'BOUYGUES', 'FREE') ; Free Mobile = 'FREE', Bouygues Telecom = 'BOUYGUES'"
+
+  - nom: technologie
+    mots: [2g, 3g, 4g, 5g, gsm, umts, lte, nr, techno, generation]
+    definition: "2G = GSM, 3G = UMTS, 4G = LTE, 5G = NR."
+    sql: "techno in ('2G', '3G', '4G', '5G') dans fact_indispo, agg_indispo_dept_jour et fact_station"
+
+  - nom: service voix ou data
+    mots: [voix, appel, appels, telephoner, data, internet, donnees]
+    definition: Voix = appels ; data = internet mobile.
+    sql: "fact_indispo_site.voix_hs / data_hs ; fact_indispo.service in ('voix', 'data')"
+
+  - nom: departement et region
+    mots: [departement, region, rhone, paris, ile-de-france, auvergne, bretagne, normandie, occitanie, provence,
+           corse, gironde, nord, bouches-du-rhone, alpes, loire, aquitaine, grand est, hauts-de-france]
+    definition: Les faits portent le code département ; le nom et la région sont dans dim_departement.
+    sql: "join dim_departement d using (departement) where d.nom = 'Rhône' (ou d.region = 'Auvergne-Rhône-Alpes')"
+
+  - nom: commune
+    mots: [commune, communes, ville, villes, population, habitants]
+    definition: Paris, Lyon et Marseille peuvent être codées par arrondissement (75101...) ou par commune (75056).
+    sql: "join dim_commune c using (code_insee) ; pour Paris : c.nom = 'Paris' or c.code_commune_parent = '75056'"
+
+  - nom: dates relatives
+    mots: [hier, aujourd, semaine derniere, cette semaine, mois dernier, ce mois, depuis le, derniers jours, recemment]
+    definition: >
+      Les relevés vont jusqu'à hier. "Aujourd'hui" ou "actuellement" = dernier relevé disponible.
+      "La semaine dernière" = du lundi au dimanche de la semaine précédente.
+    sql: >
+      dernier relevé : date = (select max(date) from fact_indispo_site) ;
+      semaine dernière : date between date_trunc('week', current_date) - interval 7 day
+      and date_trunc('week', current_date) - interval 1 day
+
+  - nom: anciennete d'une panne
+    mots: [depuis plus de, depuis combien, duree, longtemps, jours, ancienne]
+    definition: Nombre de jours écoulés entre le début de la panne et le relevé.
+    sql: "fact_indispo_site.nb_jours_depuis_debut, en général au dernier relevé"
+
+  - nom: incident ou maintenance
+    mots: [incident, maintenance, travaux, raison, cause]
+    definition: Cause déclarée par l'opérateur.
+    sql: "raison in ('incident', 'maintenance') ; agg_sites_hs_dept_jour.nb_sites_incident / nb_sites_maintenance"
+
+  - nom: deploiement et mise en service
+    mots: [deploye, deploiement, mis en service, mise en service, installe, actif, antenne, antennes, emetteur, nouveau]
+    definition: >
+      Déployé = émetteur actif. Les émetteurs 5G ont tous le statut 'Techniquement opérationnel' :
+      ne jamais filtrer sur statut = 'En service' pour la 5G.
+    sql: >
+      fact_station where est_actif ; sites 5G par trimestre de première mise en service :
+      min(date_mise_service) par site_id where techno = '5G'
+
+  - nom: bande de frequence
+    mots: [bande, frequence, mhz, 700, 800, 900, 1800, 2100, 2600, 3500]
+    definition: Bande de fréquence de l'émetteur en MHz (3500 = 5G "bande cœur").
+    sql: "fact_station.bande_mhz"
+
+  - nom: metropole et outre-mer
+    mots: [metropole, metropolitaine, outre-mer, dom, drom, antilles, reunion, guyane, mayotte]
+    definition: Outre-mer = départements dont le code commence par 97 ou 98.
+    sql: "metropole : departement not like '97%' and departement not like '98%'"

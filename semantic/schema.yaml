@@ -1,0 +1,170 @@
+# Schéma enrichi exposé au LLM : uniquement les tables du modèle (dim_, fact_, agg_).
+# Descriptions courtes : le contexte du modèle local est limité (num_ctx = 4096).
+# Validé contre la base par : python -m netquery.schema --check
+
+tables:
+
+  dim_operateur:
+    description: Opérateurs mobiles (4 de métropole + opérateurs d'outre-mer).
+    grain: un opérateur
+    columns:
+      operateur_id: {desc: code opérateur, values: [ORANGE, SFR, BOUYGUES, FREE, autres codes outre-mer]}
+      nom: {desc: nom commercial (Orange, SFR, Bouygues Telecom, Free Mobile, ...)}
+      est_metropole: {desc: vrai pour les 4 opérateurs de métropole}
+
+  dim_departement:
+    description: Départements avec leur région.
+    grain: un département
+    columns:
+      departement: {desc: "code département ('01', '2A', '69', '974')"}
+      nom: {desc: "nom du département avec accents ('Rhône', 'Bouches-du-Rhône')"}
+      region_code: {desc: code INSEE de la région}
+      region: {desc: "nom de la région ('Auvergne-Rhône-Alpes', 'Île-de-France')"}
+
+  dim_commune:
+    description: Communes (et arrondissements de Paris, Lyon, Marseille) avec population.
+    grain: une commune
+    columns:
+      code_insee: {desc: code INSEE de la commune}
+      nom: {desc: nom de la commune}
+      departement: {desc: code département}
+      departement_nom: {desc: nom du département}
+      region_code: {desc: code INSEE de la région}
+      region: {desc: nom de la région}
+      population: {desc: population municipale}
+      est_arrondissement: {desc: vrai pour un arrondissement municipal}
+      code_commune_parent: {desc: code INSEE de la commune d'un arrondissement (75056, 69123, 13055)}
+
+  dim_date:
+    description: Calendrier.
+    grain: un jour
+    columns:
+      date: {desc: jour}
+      annee: {desc: année}
+      trimestre: {desc: trimestre 1 à 4}
+      mois: {desc: mois 1 à 12}
+      mois_nom: {desc: "nom du mois en minuscules ('janvier')"}
+      semaine_iso: {desc: numéro de semaine ISO}
+      jour_semaine: {desc: 1 = lundi ... 7 = dimanche}
+      jour_nom: {desc: "nom du jour en minuscules ('lundi')"}
+      est_weekend: {desc: samedi ou dimanche}
+
+  dim_site:
+    description: Sites mobiles (une station ANFR d'un opérateur à un emplacement).
+    grain: un site
+    columns:
+      site_id: {desc: numéro de station ANFR (ou 'NA-...' si inconnu de l'ANFR)}
+      operateur_id: {desc: opérateur du site}
+      support_id: {desc: support physique (pylône, toit) partagé entre opérateurs}
+      code_insee: {desc: commune du site}
+      departement: {desc: code département}
+      lat: {desc: latitude WGS84}
+      lon: {desc: longitude WGS84}
+      hauteur_m: {desc: hauteur du support en mètres}
+      date_mise_service: {desc: première mise en service d'un émetteur actif, toutes technos}
+      nb_emetteurs: {desc: nombre d'émetteurs déclarés}
+      nb_emetteurs_actifs: {desc: nombre d'émetteurs actifs}
+      a_2g: {desc: site avec au moins un émetteur 2G actif}
+      a_3g: {desc: site avec au moins un émetteur 3G actif}
+      a_4g: {desc: site avec au moins un émetteur 4G actif}
+      a_5g: {desc: site avec au moins un émetteur 5G actif}
+      source: {desc: origine du site, values: [anfr, arcep]}
+
+  fact_station:
+    description: Emetteurs radio déclarés à l'ANFR (déploiement du réseau, instantané hebdomadaire).
+    grain: un émetteur (site x système radio)
+    usage: déploiement, nombre de sites ou d'antennes par techno, bande, opérateur, mises en service.
+    columns:
+      emetteur_id: {desc: identifiant de l'émetteur}
+      site_id: {desc: site (dim_site)}
+      operateur_id: {desc: opérateur}
+      departement: {desc: code département}
+      code_insee: {desc: commune}
+      techno: {desc: génération, values: [2G, 3G, 4G, 5G]}
+      systeme: {desc: "norme et bande ('LTE 800', '5G NR 3500')"}
+      norme: {desc: norme radio, values: [GSM, UMTS, LTE, 5G]}
+      bande_mhz: {desc: bande de fréquence en MHz, values: [700, 800, 900, 1800, 2100, 2600, 3500]}
+      statut: {desc: statut ANFR, values: [En service, Techniquement opérationnel, Projet approuvé]}
+      est_actif: {desc: "vrai si 'En service' ou 'Techniquement opérationnel' (filtre à utiliser pour compter le déployé)"}
+      date_mise_service: {desc: date de mise en service de l'émetteur}
+
+  fact_indispo_site:
+    description: Sites déclarés hors service (au moins partiellement) par les opérateurs, un relevé par jour (Arcep).
+    grain: un site un jour donné
+    usage: compter des sites en panne, ancienneté des pannes, incidents contre maintenances.
+    partition: date
+    cluster: [operateur_id, departement]
+    columns:
+      date: {desc: jour du relevé}
+      site_id: {desc: site (dim_site)}
+      operateur_id: {desc: opérateur}
+      departement: {desc: code département}
+      code_insee: {desc: commune}
+      raison: {desc: cause déclarée, values: [incident, maintenance, null]}
+      detail: {desc: précision, values: [Incident en cours, Maintenance en cours, null]}
+      propre: {desc: indicateur 'propre' de l'Arcep (signification non documentée ici)}
+      voix_hs: {desc: service voix hors service sur le site}
+      data_hs: {desc: service data (internet mobile) hors service sur le site}
+      debut: {desc: début de l'indisponibilité}
+      fin_prevue: {desc: date de fin prévue annoncée par l'opérateur}
+      debut_voix: {desc: début de la coupure voix}
+      fin_voix_prevue: {desc: fin prévue de la coupure voix}
+      debut_data: {desc: début de la coupure data}
+      fin_data_prevue: {desc: fin prévue de la coupure data}
+      nb_jours_depuis_debut: {desc: nombre de jours entre debut et le jour du relevé}
+
+  fact_indispo:
+    description: Etat de chaque service et techno des sites indisponibles (format long).
+    grain: un site x un jour x un service x une techno
+    usage: pannes par techno (4G, 5G...) ou par service. NON additif entre technos, compter avec count(distinct site_id).
+    partition: date
+    cluster: [operateur_id, departement]
+    columns:
+      date: {desc: jour du relevé}
+      site_id: {desc: site (dim_site)}
+      operateur_id: {desc: opérateur}
+      departement: {desc: code département}
+      code_insee: {desc: commune}
+      service: {desc: service, values: [voix, data]}
+      techno: {desc: génération, values: [2G, 3G, 4G, 5G]}
+      est_hs: {desc: vrai si ce service est hors service dans cette techno, faux s'il fonctionne}
+      raison: {desc: cause déclarée, values: [incident, maintenance, null]}
+
+  agg_sites_hs_dept_jour:
+    description: Nombre de sites indisponibles par jour, département et opérateur (toutes technos).
+    grain: un jour x un département x un opérateur
+    usage: à privilégier pour les totaux par jour, département, région ou opérateur (peu coûteux).
+    partition: date
+    columns:
+      date: {desc: jour du relevé}
+      departement: {desc: code département}
+      operateur_id: {desc: opérateur}
+      nb_sites_indispo: {desc: sites indisponibles}
+      nb_sites_voix_hs: {desc: sites avec la voix HS}
+      nb_sites_data_hs: {desc: sites avec la data HS}
+      nb_sites_voix_et_data_hs: {desc: sites avec voix et data HS}
+      nb_sites_incident: {desc: sites HS pour incident}
+      nb_sites_maintenance: {desc: sites HS pour maintenance}
+
+  agg_indispo_dept_jour:
+    description: Nombre de sites HS par jour, département, opérateur, service et techno.
+    grain: un jour x un département x un opérateur x un service x une techno
+    usage: à privilégier pour les pannes par techno quand on ne compte pas de sites distincts sur plusieurs jours.
+    partition: date
+    columns:
+      date: {desc: jour du relevé}
+      departement: {desc: code département}
+      operateur_id: {desc: opérateur}
+      service: {desc: service, values: [voix, data]}
+      techno: {desc: génération, values: [2G, 3G, 4G, 5G]}
+      nb_sites_hs: {desc: sites où ce service est HS dans cette techno}
+      nb_sites_declares: {desc: sites indisponibles qui portent cette techno (HS ou non)}
+
+# Jointures autorisées (clé commune -> tables)
+joins:
+  - "fact_* / agg_* .operateur_id = dim_operateur.operateur_id"
+  - "fact_* / agg_* / dim_site .departement = dim_departement.departement"
+  - "fact_* / dim_site .code_insee = dim_commune.code_insee"
+  - "fact_* .site_id = dim_site.site_id"
+  - "fact_indispo* / agg_* .date = dim_date.date"
+  - "fact_station.date_mise_service = dim_date.date"
