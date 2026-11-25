@@ -1,0 +1,160 @@
+# NetQuery
+
+**Interroger les données des réseaux mobiles français en langage naturel.**
+
+NetQuery est un assistant text-to-SQL : on pose une question en français
+(« Combien de sites SFR étaient en panne 4G dans le Rhône la semaine dernière ? »),
+l'outil génère la requête SQL, la vérifie, l'exécute et renvoie le résultat
+sous forme de tableau, de graphique ou de carte.
+
+Le projet vise un cas d'usage réaliste d'opérateur télécom : les données sont
+dans un entrepôt cloud facturé à l'usage, donc l'outil doit produire des
+requêtes **justes**, **sûres** et **peu coûteuses**.
+
+## Objectifs
+
+- Répondre à des questions métier sur la disponibilité, le déploiement et la qualité des réseaux mobiles.
+- Garantir la sécurité : lecture seule, uniquement des `SELECT`, limites de volume et de temps.
+- Réduire le coût et la latence : partitions, tables agrégées, estimation du coût avant exécution, caches.
+- Mesurer tout cela sur un jeu d'évaluation (exactitude, octets scannés, latence, coût).
+
+## Données
+
+Toutes les sources sont publiques (open data, data.gouv.fr).
+
+| Source | Contenu | Fréquence |
+|---|---|---|
+| [Arcep, Sites indisponibles](https://www.data.gouv.fr/datasets/sites-indisponibles) | Sites mobiles déclarés hors service par les opérateurs, avec l'état par service (voix, data) et par technologie | Quotidienne |
+| [ANFR, Données sur les réseaux mobiles](https://www.data.gouv.fr/datasets/donnees-sur-les-reseaux-mobiles) | Stations 2G/3G/4G/5G : opérateur, localisation, date de mise en service, hauteur, azimuts | Hebdomadaire |
+| [Arcep, Mon Réseau Mobile](https://www.data.gouv.fr/datasets/monreseaumobile) | Couverture, mesures de qualité de service (campagnes Arcep et crowdsourcing) | Trimestrielle / annuelle |
+
+Vérifier la licence de chaque jeu de données sur sa page data.gouv.fr avant toute réutilisation publique.
+
+## Architecture
+
+```
+Question (FR)
+   │
+   ▼
+Sélection du schéma (RAG sur les descriptions de tables)
+   │   + glossaire métier + exemples question → SQL similaires
+   ▼
+LLM : génération du SQL
+   │
+   ▼
+Validation : sqlglot (SELECT uniquement), LIMIT, tables autorisées
+   │
+   ▼
+Estimation du coût (dry run BigQuery / EXPLAIN) ── trop cher ? → refus ou confirmation
+   │
+   ▼
+Exécution (utilisateur en lecture seule) ── erreur ? → correction par le LLM (2 essais max)
+   │
+   ▼
+Résultat : tableau + graphique/carte + phrase de synthèse + SQL affiché
+```
+
+### Modèle de données cible
+
+```
+dim_operateur   (operateur_id, nom)
+dim_commune     (code_insee, nom, departement, region, population)
+dim_date        (date, mois, trimestre, annee, jour_semaine)
+dim_site        (site_id, operateur_id, code_insee, lat, lon, hauteur, date_mise_service)
+
+fact_station    (site_id, techno, bande_freq, statut)                -- ANFR
+fact_indispo    (date, site_id, operateur_id, code_insee, service, techno, etat)  -- partitionné par date
+
+agg_indispo_dept_jour (date, departement, operateur_id, techno, nb_sites_hs)
+```
+
+Les tables `agg_` servent à répondre aux questions courantes sans scanner les données détaillées.
+
+## Structure du projet
+
+```
+netquery/
+├── README.md
+├── CLAUDE.md              # contexte du projet pour Claude Code
+├── requirements.txt
+├── scripts/
+│   └── ingest.py          # téléchargement + chargement DuckDB + profil du schéma
+└── data/                  # créé par le script, ignoré par git
+    ├── raw/               # fichiers bruts téléchargés (cache)
+    ├── lake/indispo/      # Parquet partitionné : date=AAAA-MM-JJ/part.parquet
+    ├── netquery.duckdb    # base locale
+    └── schema_profile.md  # colonnes, types, volumétrie, exemples
+```
+
+## Installation (Windows, PowerShell)
+
+```powershell
+git clone https://github.com/AmineBnh21/netquery.git
+cd netquery
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+Sous Linux ou macOS, activer l'environnement avec `source .venv/bin/activate`.
+
+## Utilisation
+
+```powershell
+# 30 derniers jours de sites indisponibles
+python scripts/ingest.py indispo --days 30
+
+# une période précise
+python scripts/ingest.py indispo --start 2026-10-01 --end 2026-10-31
+
+# dernière archive des stations ANFR
+python scripts/ingest.py anfr
+
+# tout charger puis générer le profil du schéma
+python scripts/ingest.py all --days 30
+
+# régénérer seulement le profil
+python scripts/ingest.py profile
+```
+
+Le script ne retélécharge jamais un fichier déjà présent dans `data/raw/`.
+Au stade brut, toutes les colonnes sont en texte : le typage et le nettoyage
+se font dans la couche staging (étape 2 de la feuille de route).
+
+Explorer la base :
+
+```powershell
+python -c "import duckdb; print(duckdb.connect('data/netquery.duckdb').sql('SHOW TABLES'))"
+```
+
+## Feuille de route
+
+- [x] **1. Ingestion** : sites indisponibles (Parquet partitionné) et stations ANFR dans DuckDB, profil du schéma.
+- [ ] **2. Staging et modèle** : typage, normalisation des opérateurs, passage au format long (service, techno, état), tables `dim_`, `fact_`, `agg_`.
+- [ ] **3. Schéma enrichi** : description de chaque table et colonne, valeurs possibles, clés de jointure, colonnes de partition, glossaire métier (YAML).
+- [ ] **4. MVP text-to-SQL** : prompt + génération + exécution sur DuckDB, interface Streamlit.
+- [ ] **5. Garde-fous** : validation sqlglot, lecture seule, `LIMIT`, timeout, boucle d'auto-correction.
+- [ ] **6. RAG** : sélection des tables pertinentes, exemples few-shot dynamiques.
+- [ ] **7. Cloud et coûts** : chargement dans BigQuery (partition par date, clustering par opérateur et département), dry run, seuil de coût, routage vers les tables `agg_`, cache du SQL normalisé, cache sémantique.
+- [ ] **8. Évaluation** : 60 à 80 questions avec le SQL attendu ; comparaison version naïve / version optimisée.
+- [ ] **9. Bonus** : questions de suivi, demande de clarification si la question est ambiguë, carte des résultats.
+
+## Évaluation (prévue)
+
+| Version | Exactitude (execution accuracy) | Octets scannés moyens | Coût moyen | Latence moyenne |
+|---|---|---|---|---|
+| Naïve : schéma complet, pas de cache | à mesurer | à mesurer | à mesurer | à mesurer |
+| Optimisée : RAG, agrégats, partitions, caches | à mesurer | à mesurer | à mesurer | à mesurer |
+
+## Exemples de questions
+
+- Combien de sites SFR étaient en panne 4G dans le Rhône la semaine dernière ?
+- Quel opérateur a eu le plus d'indisponibilités en Auvergne-Rhône-Alpes depuis le 1er octobre ?
+- Combien de sites 5G ont été mis en service par opérateur chaque trimestre ?
+- Quelles communes ont des sites hors service depuis plus de 7 jours ?
+- Et pour Bouygues Telecom seulement ?
+
+## Auteur
+
+Mohamed Amine BENHAMAID, Master 2 Intelligence Artificielle, Université Claude Bernard Lyon 1
+[GitHub](https://github.com/AmineBnh21) · [LinkedIn](https://www.linkedin.com/in/mohamed-amine-benhamaid)
