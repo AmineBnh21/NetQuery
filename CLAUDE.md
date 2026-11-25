@@ -23,7 +23,11 @@ Projet portfolio d'un étudiant en M2 IA, orienté poste de Data Analyst / ingé
 - Étape 3 faite : `semantic/schema.yaml` (tables, colonnes, valeurs, jointures, partitions) et
   `semantic/glossaire.yaml` (mots-clés -> définition + indice SQL). `netquery/schema.py` : `render_schema(tables)`,
   `glossary_for(question)`, `check()`. Après toute modification du modèle SQL : `python -m netquery.schema --check`.
-- Prochaine étape : MVP text-to-SQL (étape 4 du README), avec `netquery/llm.py` générique (voir section LLM).
+- Étape 4 faite : `netquery/prompt.py` (choix des tables par règles sur le glossaire, 2 exemples de
+  `semantic/exemples.yaml`), `llm.py`, `sql_guard.py` (sqlglot + connexion DuckDB read_only,
+  enable_external_access=false, lock_configuration, timeout par interrupt), `pipeline.py`, `app.py` (Streamlit).
+  Tests : `python -m pytest` ; exemples : `python -m netquery.prompt --check`.
+- Prochaine étape : boucle d'auto-correction (étape 5), puis sélection des tables par RAG (étape 6).
 
 ## Conventions
 

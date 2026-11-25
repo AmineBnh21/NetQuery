@@ -102,8 +102,15 @@ netquery/
 ├── semantic/
 │   ├── schema.yaml        # description des tables et colonnes, valeurs, jointures, partitions
 │   └── glossaire.yaml     # vocabulaire métier relié aux tables et colonnes
+├── semantic/exemples.yaml # exemples question -> SQL (few-shot, base de l'évaluation)
 ├── netquery/
-│   └── schema.py          # chargement, validation contre la base, rendu compact pour le prompt
+│   ├── schema.py          # chargement, validation contre la base, rendu compact pour le prompt
+│   ├── prompt.py          # choix des tables, glossaire et exemples envoyés au LLM
+│   ├── llm.py             # client générique (API compatible OpenAI, Ollama par défaut)
+│   ├── sql_guard.py       # garde-fous : SELECT seul, tables autorisées, LIMIT, lecture seule, timeout
+│   └── pipeline.py        # question -> SQL -> résultat
+├── app.py                 # interface Streamlit
+├── tests/                 # pytest : garde-fous et pipeline (faux LLM)
 └── data/                  # créé par le script, ignoré par git
     ├── raw/               # fichiers bruts téléchargés (cache)
     ├── lake/indispo/      # Parquet partitionné : date=AAAA-MM-JJ/part.parquet
@@ -122,6 +129,14 @@ pip install -r requirements.txt
 ```
 
 Sous Linux ou macOS, activer l'environnement avec `source .venv/bin/activate`.
+
+Modèle de langage local avec [Ollama](https://ollama.com) :
+
+```powershell
+winget install Ollama.Ollama
+ollama pull qwen2.5-coder:3b
+copy .env.example .env   # adapter si besoin (autre modèle, autre fournisseur compatible OpenAI)
+```
 
 ## Utilisation
 
@@ -169,6 +184,19 @@ python -m netquery.schema --check
 python -m netquery.schema --render fact_indispo dim_departement --question "sites SFR en panne 4G dans le Rhône"
 ```
 
+Poser une question :
+
+```powershell
+# en ligne de commande
+python -m netquery.pipeline "Combien de sites SFR étaient en panne 4G dans le Rhône la semaine dernière ?"
+
+# interface web
+streamlit run app.py
+
+# tests
+python -m pytest
+```
+
 Le schéma complet représente environ 1 900 tokens, deux tables environ 360 : avec un modèle local
 limité à 4 096 tokens de contexte, seules les tables utiles à la question sont envoyées.
 
@@ -183,7 +211,7 @@ python -c "import duckdb; print(duckdb.connect('data/netquery.duckdb').sql('SHOW
 - [x] **1. Ingestion** : sites indisponibles (Parquet partitionné) et stations ANFR dans DuckDB, profil du schéma.
 - [x] **2. Staging et modèle** : typage, normalisation des opérateurs, passage au format long (service, techno, état), tables `dim_`, `fact_`, `agg_`.
 - [x] **3. Schéma enrichi** : description de chaque table et colonne, valeurs possibles, clés de jointure, colonnes de partition, glossaire métier (YAML).
-- [ ] **4. MVP text-to-SQL** : prompt + génération + exécution sur DuckDB, interface Streamlit.
+- [x] **4. MVP text-to-SQL** : prompt + génération + exécution sur DuckDB, interface Streamlit.
 - [ ] **5. Garde-fous** : validation sqlglot, lecture seule, `LIMIT`, timeout, boucle d'auto-correction.
 - [ ] **6. RAG** : sélection des tables pertinentes, exemples few-shot dynamiques.
 - [ ] **7. Cloud et coûts** : chargement dans BigQuery (partition par date, clustering par opérateur et département), dry run, seuil de coût, routage vers les tables `agg_`, cache du SQL normalisé, cache sémantique.

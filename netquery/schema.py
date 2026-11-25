@@ -52,6 +52,7 @@ class Term:
     mots: list[str]
     definition: str
     sql: str
+    tables: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -77,7 +78,8 @@ def load(semantic_dir: Path = SEMANTIC_DIR) -> Semantic:
                 for c, spec in t["columns"].items()]
         tables[name] = Table(name, t["description"], t["grain"], t.get("usage"),
                              t.get("partition"), t.get("cluster") or [], cols)
-    termes = [Term(x["nom"], [normalize(str(m)) for m in x["mots"]], x["definition"].strip(), x["sql"].strip())
+    termes = [Term(x["nom"], [normalize(str(m)) for m in x["mots"]], x["definition"].strip(), x["sql"].strip(),
+                   x.get("tables") or [])
               for x in gloss["termes"]]
     return Semantic(tables, schema.get("joins", []), termes)
 
@@ -205,7 +207,8 @@ def check(db_path: Path = DB_PATH) -> list[str]:
     # 5. le glossaire ne cite que des tables qui existent
     known = set(sem.tables)
     for term in sem.termes:
-        for ref in re.findall(r"\b((?:dim|fact|agg)_[a-z_]+)", term.sql + " " + term.definition):
+        refs = re.findall(r"\b((?:dim|fact|agg)_[a-z_]+)", term.sql + " " + term.definition) + term.tables
+        for ref in refs:
             if ref not in known:
                 errors.append(f"glossaire '{term.nom}' : table inconnue {ref}")
     return errors

@@ -1,0 +1,95 @@
+# Exemples question -> SQL (DuckDB).
+# Usages : exemples few-shot dans le prompt (les plus proches de la question), base du jeu d'évaluation.
+# Chaque requête est validée et exécutée par : python -m netquery.prompt --check
+
+exemples:
+
+  - question: Combien de sites Orange étaient en panne hier ?
+    tables: [fact_indispo_site]
+    sql: |
+      select count(*) as nb_sites
+      from fact_indispo_site
+      where operateur_id = 'ORANGE'
+        and date = (select max(date) from fact_indispo_site)
+
+  - question: Combien de sites Free ont eu la 5G en panne dans les Bouches-du-Rhône depuis le 1er novembre ?
+    tables: [fact_indispo, dim_departement]
+    sql: |
+      select count(distinct f.site_id) as nb_sites
+      from fact_indispo f
+      join dim_departement d using (departement)
+      where f.operateur_id = 'FREE'
+        and f.techno = '5G'
+        and f.est_hs
+        and d.nom = 'Bouches-du-Rhône'
+        and f.date >= date '2026-11-01'
+
+  - question: Nombre de sites en panne par opérateur et par jour la semaine dernière
+    tables: [fact_indispo_site]
+    sql: |
+      select date, operateur_id, count(*) as nb_sites
+      from fact_indispo_site
+      where date between date_trunc('week', current_date) - interval 7 day
+                     and date_trunc('week', current_date) - interval 1 day
+      group by date, operateur_id
+      order by date, operateur_id
+
+  - question: Quelle région compte le plus de sites en panne pour maintenance aujourd'hui ?
+    tables: [fact_indispo_site, dim_departement]
+    sql: |
+      select d.region, count(*) as nb_sites
+      from fact_indispo_site f
+      join dim_departement d using (departement)
+      where f.raison = 'maintenance'
+        and f.date = (select max(date) from fact_indispo_site)
+      group by d.region
+      order by nb_sites desc
+      limit 1
+
+  - question: Quels sites SFR sont en panne depuis plus de 30 jours ?
+    tables: [fact_indispo_site]
+    sql: |
+      select site_id, departement, code_insee, debut, nb_jours_depuis_debut
+      from fact_indispo_site
+      where operateur_id = 'SFR'
+        and date = (select max(date) from fact_indispo_site)
+        and nb_jours_depuis_debut > 30
+      order by nb_jours_depuis_debut desc
+
+  - question: Combien d'émetteurs 5G actifs par opérateur et par bande de fréquence ?
+    tables: [fact_station]
+    sql: |
+      select operateur_id, bande_mhz, count(*) as nb_emetteurs
+      from fact_station
+      where techno = '5G' and est_actif
+        and operateur_id in ('ORANGE', 'SFR', 'BOUYGUES', 'FREE')
+      group by operateur_id, bande_mhz
+      order by operateur_id, bande_mhz
+
+  - question: Combien de sites ont reçu leur première antenne 5G chaque trimestre de 2025 ?
+    tables: [fact_station, dim_date]
+    sql: |
+      with premiere_5g as (
+          select site_id, min(date_mise_service) as date_5g
+          from fact_station
+          where techno = '5G' and est_actif
+          group by site_id
+      )
+      select d.annee, d.trimestre, count(*) as nb_sites
+      from premiere_5g p
+      join dim_date d on d.date = p.date_5g
+      where d.annee = 2025
+      group by d.annee, d.trimestre
+      order by d.trimestre
+
+  - question: Quelles sont les 10 communes de plus de 10 000 habitants avec le plus de sites en panne hier ?
+    tables: [fact_indispo_site, dim_commune]
+    sql: |
+      select c.nom, c.departement, c.population, count(*) as nb_sites
+      from fact_indispo_site f
+      join dim_commune c using (code_insee)
+      where f.date = (select max(date) from fact_indispo_site)
+        and c.population > 10000
+      group by c.nom, c.departement, c.population
+      order by nb_sites desc
+      limit 10
