@@ -1,0 +1,19 @@
+# données (téléchargées et régénérables)
+data/
+*.duckdb
+*.duckdb.wal
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# secrets
+.env
+*.json.key
+gcp-*.json
+
+# IDE
+.vscode/
+.idea/
