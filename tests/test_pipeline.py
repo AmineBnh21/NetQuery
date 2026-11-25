@@ -44,7 +44,7 @@ def test_reponse_correcte():
 
 
 def test_requete_dangereuse_refusee():
-    ans = ask("supprime tout", llm=FakeLLM("```sql\ndrop table fact_indispo_site\n```"))
+    ans = ask("Supprime les sites en panne", llm=FakeLLM("```sql\ndrop table fact_indispo_site\n```"))
     assert ans.error_kind == "securite"
     con = readonly_connection()
     assert con.execute("select count(*) from fact_indispo_site").fetchone()[0] > 0
@@ -52,17 +52,17 @@ def test_requete_dangereuse_refusee():
 
 
 def test_lecture_fichier_refusee():
-    ans = ask("lis un fichier", llm=FakeLLM("select * from read_csv('data/schema_profile.md')"))
+    ans = ask("Lis le fichier des sites en panne", llm=FakeLLM("select * from read_csv('data/schema_profile.md')"))
     assert ans.error_kind == "securite"
 
 
 def test_erreur_execution():
-    ans = ask("question", llm=FakeLLM("select colonne_inexistante from fact_indispo_site"))
+    ans = ask("Combien de sites en panne ?", llm=FakeLLM("select colonne_inexistante from fact_indispo_site"))
     assert ans.error_kind == "execution"
 
 
 def test_pas_de_sql():
-    ans = ask("question", llm=FakeLLM("Je ne sais pas."))
+    ans = ask("Combien de sites en panne ?", llm=FakeLLM("Je ne sais pas."))
     assert ans.error_kind == "extraction"
 
 
@@ -78,14 +78,14 @@ def test_auto_correction():
 def test_explication_colonne_mal_prefixee():
     sql = "select d.operateur_id from fact_indispo_site f join dim_departement d using (departement)"
     llm = FakeLLM(sql, "select f.operateur_id from fact_indispo_site f join dim_departement d using (departement)")
-    ans = ask("question", llm=llm)
+    ans = ask("Combien de sites en panne ?", llm=llm)
     assert ans.ok
     assert "operateur_id se trouve dans : fact_indispo_site (alias f)" in llm.messages[-1]["content"]
 
 
 def test_auto_correction_limitee():
     llm = FakeLLM("select nb from fact_indispo_site")
-    ans = ask("question", llm=llm, max_retries=2)
+    ans = ask("Combien de sites en panne ?", llm=llm, max_retries=2)
     assert not ans.ok and llm.calls == 3 and ans.nb_corrections == 2
 
 
@@ -122,3 +122,28 @@ def test_cache_des_questions(tmp_path):
     # question différente : nouvel appel
     ask("Combien de sites SFR en panne ?", llm=llm, cache=cache)
     assert llm.calls == 2
+
+
+def test_question_de_suivi():
+    from netquery.prompt import Turn
+
+    prev = Turn("Combien de sites SFR en panne hier dans le Rhône ?",
+                "select count(*) as n from fact_indispo_site where operateur_id = 'SFR' and departement = '69'")
+    llm = FakeLLM("select count(*) as n from fact_indispo_site where operateur_id = 'BOUYGUES' and departement = '69'")
+    ans = ask("Et pour Bouygues Telecom ?", llm=llm, previous=prev)
+    assert ans.ok and ans.followup
+    user = llm.messages[-1]["content"]
+    assert "Question précédente" in user and "operateur_id = 'SFR'" in user
+    assert ans.warnings == []          # département repris de la question précédente : pas d'alerte
+
+
+def test_filtre_non_demande_signale():
+    llm = FakeLLM("select count(*) as n from fact_indispo_site where operateur_id = 'SFR'")
+    ans = ask("Combien de sites en panne ?", llm=llm)
+    assert ans.ok and ans.warnings == ["opérateur SFR"] and "opérateur : SFR" in ans.filters
+
+
+def test_question_vague_demande_precision():
+    llm = FakeLLM("select 1")
+    ans = ask("Bonjour", llm=llm)
+    assert ans.error_kind == "clarification" and llm.calls == 0

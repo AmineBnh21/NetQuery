@@ -250,38 +250,85 @@ def data_context(today: dt.date | None = None) -> str:
     return line
 
 
+# --------------------------------------------------------------------------- questions de suivi
+
+_FOLLOWUP_START = re.compile(
+    r"^\s*(et|meme chose|pareil|idem|plutot|maintenant|seulement|uniquement|par|pour|en|dans|sur)\b")
+_FOLLOWUP_ANY = re.compile(r"\b(seulement|uniquement|a la place|au lieu de|meme question|pareil)\b")
+
+
+def is_followup(question: str) -> bool:
+    """Question qui n'a de sens qu'avec la précédente : « Et pour Bouygues ? », « Par région ? »,
+    « Seulement la 5G ». Règles simples (pas d'appel au LLM) : début de phrase typique, ou mot de
+    restriction dans une question courte."""
+    q = normalize(question)
+    n_words = len(re.findall(r"[a-z0-9]+", q))
+    if q.lstrip().startswith("et ") or q.strip() in ("et", "et ?"):
+        return True
+    return n_words <= 7 and bool(_FOLLOWUP_START.search(q) or _FOLLOWUP_ANY.search(q))
+
+
+@dataclass
+class Turn:
+    """Echange précédent réussi, utilisé comme contexte d'une question de suivi."""
+    question: str
+    sql: str
+
+
 def build_prompt(question: str, today: dt.date | None = None, use_rag: bool = True,
-                 naive: bool = False) -> Prompt:
+                 naive: bool = False, previous: Turn | None = None) -> Prompt:
     """naive=True : version de référence pour l'évaluation (schéma complet, ni glossaire,
-    ni lieux, ni exemples)."""
+    ni lieux, ni exemples).
+    previous : échange précédent, si `question` est une question de suivi."""
     if naive:
         tables = list(load().tables)
         parts = ["Schéma :", render_schema(tables), "", data_context(today), "", f"Question : {question}"]
         messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": "\n".join(parts)}]
         return Prompt(messages, tables, [], [])
 
-    terms = glossary_for(question)
-    places = resolve_places(question)
+    # pour une question de suivi, le contexte (tables, glossaire, exemples) vient des deux questions ;
+    # un lieu cité dans la suite remplace celui de la question précédente
+    selection = f"{previous.question} {question}" if previous else question
+    terms = glossary_for(selection)
+    places = resolve_places(question) or (resolve_places(previous.question) if previous else [])
     if places and all(p.kind == "departement" for p in places):
         # les faits portent déjà le code département : inutile d'envoyer dim_departement
         terms = [t for t in terms if t.nom != "departement et region"]
     if use_rag:
-        tables, examples = rag_select(question, terms)
+        tables, examples = rag_select(selection, terms)
     else:
-        tables = select_tables(question, terms)
+        tables = select_tables(selection, terms)
         examples = pick_examples(tables)
+    if previous:
+        # les tables de la requête précédente restent disponibles pour la modifier
+        from netquery.sql_guard import validate
+
+        try:
+            tables = sorted(set(tables) | set(validate(previous.sql).tables),
+                            key=lambda t: (not t.startswith("fact_"), t))
+        except Exception:  # noqa: BLE001
+            pass
+        examples = examples[:1]  # le SQL précédent sert d'exemple principal
 
     parts = ["Schéma :", render_schema(tables)]
     if terms:
         parts += ["", "Glossaire :", render_glossary(terms)]
     if places:
         parts += ["", "Lieux reconnus dans la question :"] + [f"- {p.hint()}" for p in places]
-        parts += [f"- {h}" for h in operator_hints(question, places)]
+        parts += [f"- {h}" for h in operator_hints(selection, places)]
     if examples:
         parts += ["", "Exemples :"]
         for ex in examples:
             parts += [f"Question : {ex.question}", f"```sql\n{ex.sql}\n```"]
-    parts += ["", data_context(today), "", f"Question : {question}"]
+    parts += ["", data_context(today), ""]
+    if previous:
+        parts += [f"Question précédente : {previous.question}", "Requête précédente :",
+                  f"```sql\n{previous.sql}\n```",
+                  f"Question de suivi : {question}",
+                  "Réécris la requête précédente en appliquant uniquement la modification demandée "
+                  "par la question de suivi ; garde tous les autres filtres."]
+    else:
+        parts += [f"Question : {question}"]
 
     messages = [
         {"role": "system", "content": SYSTEM},

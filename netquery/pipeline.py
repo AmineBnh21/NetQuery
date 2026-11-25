@@ -19,8 +19,9 @@ import pandas as pd
 
 from netquery.llm import LLM, ChatModel
 from netquery.cache import QuestionCache, question_key
+from netquery.explain import clarification, describe_filters, unrequested_filters
 from netquery.optimize import latest_date, rewrite_latest_date
-from netquery.prompt import Prompt, build_prompt
+from netquery.prompt import Prompt, Turn, build_prompt, is_followup
 from netquery.sql_guard import MAX_ROWS, UnsafeSQLError, execute, validate
 
 
@@ -39,6 +40,9 @@ class Answer:
     attempts: list = field(default_factory=list)   # un Attempt par appel au modèle
     cost: dict = field(default_factory=dict)       # octets lus, coût (BigQuery), réécritures appliquées
     from_cache: bool = False                       # SQL repris du cache, sans appel au LLM
+    followup: bool = False                         # question traitée comme suite de la précédente
+    filters: list = field(default_factory=list)    # filtres appliqués, en français
+    warnings: list = field(default_factory=list)   # filtres que la question ne demandait pas
 
     @property
     def ok(self) -> bool:
@@ -149,20 +153,35 @@ def _try_once(text: str, backend: str = BACKEND) -> dict:
     return out | {"df": res.df, "truncated": truncated, "exec_s": res.elapsed_s}
 
 
+def _annotate(ans: Answer, context: str) -> Answer:
+    """Filtres en français et alertes sur les filtres non demandés (réponses réussies)."""
+    if ans.ok and ans.sql:
+        ans.filters = describe_filters(ans.sql)
+        ans.warnings = unrequested_filters(ans.question, ans.sql, context=context)
+    return ans
+
+
 def ask(question: str, llm: ChatModel | None = None, max_retries: int = MAX_RETRIES,
         use_rag: bool = True, naive: bool = False, backend: str | None = None,
-        cache: QuestionCache | None = None) -> Answer:
+        cache: QuestionCache | None = None, previous: Turn | None = None) -> Answer:
     """cache : si fourni, une question déjà posée réutilise son SQL validé sans appeler le LLM."""
     t0 = time.perf_counter()
     backend = backend or BACKEND
-    prompt = build_prompt(question, use_rag=use_rag, naive=naive)
-    ans = Answer(question=question, prompt=prompt)
+    followup = previous is not None and is_followup(question)
+    prompt = build_prompt(question, use_rag=use_rag, naive=naive, previous=previous if followup else None)
+    ans = Answer(question=question, prompt=prompt, followup=followup)
+    context = previous.question if followup else ""
+    if not naive and not followup:
+        msg = clarification(question)
+        if msg:  # question trop vague : on demande une précision plutôt que de laisser le modèle inventer
+            ans.error, ans.error_kind = msg, "clarification"
+            return ans
     ans.timings["prompt_s"] = time.perf_counter() - t0
     ans.timings["llm_s"] = 0.0
     messages = list(prompt.messages)
 
     key = None
-    if cache is not None:
+    if cache is not None and not followup:  # une suite dépend de la question précédente : pas de cache
         llm = llm or LLM()
         key = question_key(question, getattr(llm, "model", "inconnu"), latest_date().isoformat())
         cached = cache.get(key)
@@ -173,7 +192,7 @@ def ask(question: str, llm: ChatModel | None = None, max_retries: int = MAX_RETR
                 ans.from_cache = True
                 ans.timings["exec_s"] = r["exec_s"]
                 ans.timings["total_s"] = time.perf_counter() - t0
-                return ans
+                return _annotate(ans, context)
             cache.drop(key)  # SQL devenu invalide (modèle de données modifié) : on régénère
 
     for attempt in range(max_retries + 1):
@@ -209,7 +228,7 @@ def ask(question: str, llm: ChatModel | None = None, max_retries: int = MAX_RETR
             {"role": "user", "content": FIX_PROMPT.format(error=explain_error(sql, error)[:MAX_ERROR_CHARS])},
         ]
     ans.timings["total_s"] = time.perf_counter() - t0
-    return ans
+    return _annotate(ans, context)
 
 
 def main(argv=None) -> int:

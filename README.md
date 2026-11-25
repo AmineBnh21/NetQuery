@@ -12,7 +12,7 @@ des réseaux 2G à 5G, avec un LLM local, des garde-fous de sécurité et un con
 ![BigQuery](https://img.shields.io/badge/BigQuery-cloud-669DF6?logo=googlebigquery&logoColor=white)
 ![Ollama](https://img.shields.io/badge/LLM-Qwen2.5--Coder%203B%20%28Ollama%29-000000?logo=ollama&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/UI-Streamlit-FF4B4B?logo=streamlit&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-72%20pytest-2ea44f)
+![Tests](https://img.shields.io/badge/tests-80%20pytest-2ea44f)
 
 </div>
 
@@ -33,6 +33,17 @@ LIMIT 1000
 
 **→ 15 sites.** Requête générée par un modèle de 3 milliards de paramètres tournant sur un simple CPU,
 validée, exécutée en lecture seule, **30 Ko lus sur BigQuery**.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/suivi.jpg" alt="Question de suivi : « Et pour SFR ? » reprend les filtres de la question précédente"></td>
+<td width="50%"><img src="docs/carte.jpg" alt="Carte des sites Orange en panne depuis plus de 30 jours"></td>
+</tr>
+<tr>
+<td align="center"><sub>Conversation : « Et pour SFR ? » reprend la date et le département, les filtres compris sont affichés en clair</sub></td>
+<td align="center"><sub>« Quels sites Orange sont en panne depuis plus de 30 jours ? » : carte générée automatiquement</sub></td>
+</tr>
+</table>
 
 ## Résultats clés
 
@@ -119,6 +130,19 @@ question (0,861). Un cache par similarité renverrait la réponse d'une autre qu
 résultat sur les deux moteurs, après correction d'un piège silencieux : `WEEK` commence le dimanche
 en BigQuery et le lundi en DuckDB, ce qui décalait « la semaine dernière » d'un jour.
 
+## Une conversation, pas un formulaire
+
+- **Questions de suivi** : « Et pour Bouygues ? », « Par région ? », « Seulement la 5G ». Détectées par des règles
+  (aucun faux positif sur les 66 questions d'évaluation), elles transmettent au modèle la question et le SQL
+  précédents avec la consigne de n'appliquer que la modification demandée. Testé sur 5 suites : toutes justes.
+- **Ce qui a été compris, en clair** : sous chaque réponse, les filtres appliqués en français
+  (« date : du 16/11/2026 au 22/11/2026 · département : Rhône · opérateur : SFR »), dates relatives calculées.
+- **Alerte sur les filtres non demandés** : première cause d'échec mesurée, le modèle recopie parfois un filtre
+  d'exemple (un « SFR » que personne n'a demandé). L'interface le signale au lieu de le masquer.
+- **Demande de précision** : une question sans notion du domaine (« Quelle est la situation ? ») reçoit une
+  demande de reformulation plutôt qu'une réponse inventée.
+- **Carte automatique** : dès qu'un résultat contient des sites, leurs coordonnées sont ajoutées et affichées.
+
 ## Sécurité
 
 Le SQL généré par un LLM est traité comme une entrée non fiable :
@@ -128,7 +152,7 @@ Le SQL généré par un LLM est traité comme une entrée non fiable :
 - `LIMIT` ajouté ou abaissé automatiquement, délai maximal d'exécution ;
 - DuckDB ouvert en lecture seule, accès aux fichiers coupé, configuration verrouillée ;
 - BigQuery : estimation par dry run, refus au-delà d'un seuil, `maximum_bytes_billed` ;
-- aucune clé dans le code (`.env`), 72 tests dont des tentatives d'injection (`DROP`, requêtes multiples,
+- aucune clé dans le code (`.env`), 80 tests dont des tentatives d'injection (`DROP`, requêtes multiples,
   lecture de fichiers).
 
 ## Évaluation
@@ -260,10 +284,12 @@ netquery/
   bigquery_backend.py  traduction DuckDB → BigQuery, dry run, seuil de coût
   optimize.py          réécriture « dernier relevé »
   cache.py             cache des questions
+  explain.py           filtres en clair, filtres non demandés, demande de précision
   evaluate.py          banc d'évaluation et rapport
 eval/                  66 questions de test, résultats par version, rapport
-tests/                 72 tests pytest (faux LLM, sans réseau)
-app.py                 interface Streamlit
+tests/                 80 tests pytest (faux LLM, sans réseau)
+app.py                 interface Streamlit (conversation, graphiques, carte)
+docs/                  captures d'écran
 ```
 
 </details>
@@ -276,8 +302,7 @@ app.py                 interface Streamlit
 - [x] RAG hybride pour les exemples few-shot
 - [x] Banc d'évaluation (66 questions, 3 versions comparées)
 - [x] BigQuery : partitions, dry run, plafond de coût, réécriture, cache
-- [ ] Questions de suivi (« Et pour Bouygues ? ») et demande de clarification
-- [ ] Carte des sites en panne
+- [x] Conversation : questions de suivi, filtres affichés en clair, demande de précision, carte
 - [ ] Nouveau jeu de questions pour valider les pistes d'amélioration (questions temporelles, modèle plus grand)
 
 ## Auteur

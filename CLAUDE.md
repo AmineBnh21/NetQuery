@@ -45,7 +45,10 @@ Projet portfolio d'un étudiant en M2 IA, orienté poste de Data Analyst / ingé
   `bigquery_backend.py` (sqlglot, ISOWEEK, dry run, BQ_MAX_BYTES), `optimize.py` (sous-requête max(date) ->
   date explicite, sinon pas d'élimination de partitions), `cache.py` (cache exact ; pas de cache sémantique).
   `NETQUERY_BACKEND=duckdb|bigquery`. Mesure des octets : `measure_bigquery()` dans evaluate.py.
-- Prochaine étape : bonus (étape 9) : questions de suivi, clarification, carte.
+- Étape 9 faite : `prompt.is_followup` + `Turn` (suite = question et SQL précédents), `explain.py`
+  (filtres en clair, filtres non demandés signalés, demande de précision), `app.py` en mode conversation
+  avec carte pydeck (coordonnées via dim_site). Captures dans `docs/`.
+- Pistes : nouveau jeu de questions pour valider des améliorations (questions temporelles, recopie de filtres).
 
 ## Conventions
 

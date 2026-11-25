@@ -53,3 +53,13 @@ def test_exemples_de_meme_structure_en_premier():
     from netquery.prompt import load_examples
     by_q = {e.question: e for e in load_examples()}
     assert all(set(by_q[q].tables) == set(pr.tables) for q in pr.examples)
+
+
+@pytest.mark.parametrize("question, attendu", [
+    ("Et pour Bouygues Telecom ?", True), ("Par région ?", True), ("Seulement la 5G", True),
+    ("Combien de sites SFR étaient en panne hier dans le Rhône ?", False),
+    ("Nombre de sites en panne par région hier", False),
+])
+def test_is_followup(question, attendu):
+    from netquery.prompt import is_followup
+    assert is_followup(question) is attendu
