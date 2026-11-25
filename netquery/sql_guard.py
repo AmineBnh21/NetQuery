@@ -109,9 +109,10 @@ def validate(sql: str, allowed_tables: set[str] | None = None, max_rows: int = M
 # --------------------------------------------------------------------------- exécution
 
 def readonly_connection(db_path: Path = DB_PATH) -> duckdb.DuckDBPyConnection:
-    con = duckdb.connect(str(db_path), read_only=True, config={"enable_external_access": False})
-    con.execute("set lock_configuration = true")
-    return con
+    # configuration verrouillée dès l'ouverture : une connexion suivante au même fichier
+    # partage l'instance DuckDB et doit déclarer exactement la même configuration
+    return duckdb.connect(str(db_path), read_only=True,
+                          config={"enable_external_access": False, "lock_configuration": True})
 
 
 @dataclass

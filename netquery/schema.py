@@ -144,10 +144,13 @@ def render_glossary(terms: list[Term]) -> str:
 
 # --------------------------------------------------------------------------- validation
 
+@lru_cache(maxsize=2)
 def _db_types(db_path: Path = DB_PATH) -> dict[str, dict[str, str]]:
     if not db_path.exists():
         return {}
-    con = duckdb.connect(str(db_path), read_only=True)
+    # même configuration que les autres connexions (DuckDB refuse deux configurations sur un fichier)
+    from netquery.sql_guard import readonly_connection
+    con = readonly_connection(db_path)
     try:
         rows = con.execute("""
             select table_name, column_name, data_type from information_schema.columns
@@ -174,7 +177,8 @@ def check(db_path: Path = DB_PATH) -> list[str]:
     for t in sorted(set(sem.tables) - set(types)):
         errors.append(f"table {t} documentée mais absente de la base")
 
-    con = duckdb.connect(str(db_path), read_only=True)
+    from netquery.sql_guard import readonly_connection
+    con = readonly_connection(db_path)
     try:
         for t in sem.tables.values():
             if t.name not in types:

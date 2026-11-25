@@ -109,7 +109,12 @@ netquery/
 │   ├── retrieval.py       # recherche hybride des exemples (BM25 + embeddings, fusion RRF)
 │   ├── llm.py             # client générique (API compatible OpenAI, Ollama par défaut)
 │   ├── sql_guard.py       # garde-fous : SELECT seul, tables autorisées, LIMIT, lecture seule, timeout
-│   └── pipeline.py        # question -> SQL -> résultat
+│   ├── pipeline.py        # question -> SQL -> résultat
+│   └── evaluate.py        # évaluation : exactitude, latence, tokens, rapport
+├── eval/
+│   ├── questions.yaml     # 66 questions de test avec leur SQL de référence (jamais montrées au modèle)
+│   ├── results/           # résultats détaillés par version (une ligne JSON par question)
+│   └── rapport.md         # rapport généré
 ├── app.py                 # interface Streamlit
 ├── tests/                 # pytest : garde-fous et pipeline (faux LLM)
 └── data/                  # créé par le script, ignoré par git
@@ -197,6 +202,11 @@ streamlit run app.py
 
 # tests
 python -m pytest
+
+# évaluation (environ 30 min par version sur CPU ; reprend là où elle s'est arrêtée)
+python -m netquery.evaluate --check                          # valider les requêtes de référence
+python -m netquery.evaluate --config naive sans_rag optimise
+python -m netquery.evaluate --report                         # régénérer eval/rapport.md
 ```
 
 Premiers résultats avec qwen2.5-coder:3b en local (CPU) : 5 questions sur 6 du jeu d'essai sont justes,
@@ -248,15 +258,53 @@ python -c "import duckdb; print(duckdb.connect('data/netquery.duckdb').sql('SHOW
 - [x] **5. Garde-fous** : validation sqlglot, lecture seule, `LIMIT`, timeout, boucle d'auto-correction.
 - [x] **6. RAG** : sélection des tables pertinentes, exemples few-shot dynamiques.
 - [ ] **7. Cloud et coûts** : chargement dans BigQuery (partition par date, clustering par opérateur et département), dry run, seuil de coût, routage vers les tables `agg_`, cache du SQL normalisé, cache sémantique.
-- [ ] **8. Évaluation** : 60 à 80 questions avec le SQL attendu ; comparaison version naïve / version optimisée.
+- [x] **8. Évaluation** : 60 à 80 questions avec le SQL attendu ; comparaison version naïve / version optimisée.
 - [ ] **9. Bonus** : questions de suivi, demande de clarification si la question est ambiguë, carte des résultats.
 
-## Évaluation (prévue)
+## Évaluation
 
-| Version | Exactitude (execution accuracy) | Octets scannés moyens | Coût moyen | Latence moyenne |
+66 questions de test (`eval/questions.yaml`), jamais montrées au modèle, réparties en 8 catégories,
+chacune avec sa requête de référence. Une réponse est juste si son résultat égale celui de la référence
+(valeurs comparées sans tenir compte de l'ordre des lignes, du nom des colonnes ni des colonnes en plus).
+Modèle : qwen2.5-coder:3b en local, sur CPU. Rapport complet : [`eval/rapport.md`](eval/rapport.md).
+
+| Version | Exactitude | Erreurs SQL | Tokens du prompt | Latence moyenne |
 |---|---|---|---|---|
-| Naïve : schéma complet, pas de cache | à mesurer | à mesurer | à mesurer | à mesurer |
-| Optimisée : RAG, agrégats, partitions, caches | à mesurer | à mesurer | à mesurer | à mesurer |
+| Naïve : schéma complet, ni glossaire, ni exemples, pas de correction | 29 % | 22 | 2 732 | 16 s |
+| Sans RAG : tables choisies, glossaire, lieux, exemples par recouvrement de tables, correction | 62 % | 1 | 1 278 | 14 s |
+| Optimisée : idem avec exemples choisis par recherche hybride | **67 %** | 0 | 1 285 | 17 s |
+
+| Catégorie | Naïve | Sans RAG | Optimisée |
+|---|---|---|---|
+| Pannes | 2/10 | 7/10 | 7/10 |
+| Technologie | 6/10 | 6/10 | 6/10 |
+| Géographie | 2/10 | 7/10 | 8/10 |
+| Temps | 1/8 | 3/8 | 2/8 |
+| Déploiement | 5/12 | 9/12 | 9/12 |
+| Parc | 3/6 | 4/6 | 4/6 |
+| Ancienneté et causes | 0/6 | 3/6 | 5/6 |
+| Outre-mer | 0/4 | 2/4 | 3/4 |
+
+Ce qu'on en retient :
+
+- **Le contexte compte plus que le modèle.** A modèle égal, envoyer seulement les tables utiles, le glossaire
+  et la reconnaissance des lieux double l'exactitude et divise le prompt par deux. Les erreurs SQL
+  (colonnes inventées, mauvaises jointures) disparaissent presque entièrement.
+- **Le RAG apporte un gain réel mais modeste** (+5 points), concentré sur l'ancienneté des pannes et l'outre-mer.
+- **Les échecs restants sont des erreurs de sens, pas de syntaxe** : le modèle recopie un filtre d'un exemple
+  (« 4 opérateurs de métropole », « 5G »), confond technologie et service, ou se trompe sur les questions
+  temporelles (« le week-end dernier », moyennes par jour, deux dates à comparer). La catégorie « temps »
+  est la plus faible.
+- La latence est similaire d'une version à l'autre (environ 15 s) : le prompt plus court compense
+  la recherche d'exemples et les corrections.
+
+Limites de la mesure : 66 questions, un seul modèle, une seule exécution (température 0). Après le premier
+passage, 4 questions du jeu ont été corrigées parce que leur référence était discutable (détail en tête de
+`eval/questions.yaml`) ; le prompt, lui, n'a pas été modifié pour corriger les échecs, afin de ne pas
+optimiser sur le jeu de test. Les pistes d'amélioration (exemples temporels, consigne contre la recopie
+de filtres, modèle plus grand) devront être validées sur un nouveau jeu.
+
+Les colonnes « octets scannés » et « coût » seront mesurées sur BigQuery (étape 7).
 
 ## Exemples de questions
 

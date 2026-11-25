@@ -126,9 +126,9 @@ def _try_once(text: str) -> tuple[str | None, pd.DataFrame | None, bool, float, 
 
 
 def ask(question: str, llm: ChatModel | None = None, max_retries: int = MAX_RETRIES,
-        use_rag: bool = True) -> Answer:
+        use_rag: bool = True, naive: bool = False) -> Answer:
     t0 = time.perf_counter()
-    prompt = build_prompt(question, use_rag=use_rag)
+    prompt = build_prompt(question, use_rag=use_rag, naive=naive)
     ans = Answer(question=question, prompt=prompt)
     ans.timings["prompt_s"] = time.perf_counter() - t0
     ans.timings["llm_s"] = 0.0

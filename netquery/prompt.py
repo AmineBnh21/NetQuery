@@ -21,7 +21,8 @@ from pathlib import Path
 
 import yaml
 
-from netquery.schema import SEMANTIC_DIR, Term, glossary_for, normalize, render_glossary, render_schema
+from netquery.schema import (SEMANTIC_DIR, Term, glossary_for, load, normalize, render_glossary,
+                             render_schema)
 
 FACTS_INDISPO = ("fact_indispo_site", "fact_indispo")
 DEFAULT_FACT = "fact_indispo_site"
@@ -249,7 +250,16 @@ def data_context(today: dt.date | None = None) -> str:
     return line
 
 
-def build_prompt(question: str, today: dt.date | None = None, use_rag: bool = True) -> Prompt:
+def build_prompt(question: str, today: dt.date | None = None, use_rag: bool = True,
+                 naive: bool = False) -> Prompt:
+    """naive=True : version de référence pour l'évaluation (schéma complet, ni glossaire,
+    ni lieux, ni exemples)."""
+    if naive:
+        tables = list(load().tables)
+        parts = ["Schéma :", render_schema(tables), "", data_context(today), "", f"Question : {question}"]
+        messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": "\n".join(parts)}]
+        return Prompt(messages, tables, [], [])
+
     terms = glossary_for(question)
     places = resolve_places(question)
     if places and all(p.kind == "departement" for p in places):

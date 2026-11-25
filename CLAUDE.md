@@ -35,7 +35,11 @@ Projet portfolio d'un étudiant en M2 IA, orienté poste de Data Analyst / ingé
   cache `data/cache/`, `EMBED_MODEL=off` pour BM25 seul ; les tests le forcent). `prompt.rag_select` :
   tables par règles (repli `dim_site` si ni panne ni date), exemples classés structure puis similarité.
   `prompt.operator_hints` : codes opérateurs d'outre-mer lus dans dim_site. 20 exemples.
-- Prochaine étape : cloud et coûts (étape 7, BigQuery) ou évaluation (étape 8, jeu de questions séparé des exemples).
+- Étape 8 faite : `eval/questions.yaml` (66 questions, références vérifiées par `--check`),
+  `netquery/evaluate.py` (configs naive / sans_rag / optimise, résultats `eval/results/*.jsonl`, rapport
+  `eval/rapport.md`). Résultats : 29 % / 62 % / 67 %. Ne pas ajuster le prompt sur les échecs de ce jeu
+  (ce serait optimiser sur le test) : créer un nouveau jeu pour valider une amélioration.
+- Prochaine étape : cloud et coûts (étape 7, BigQuery), nécessite un projet GCP créé par l'utilisateur.
 
 ## Conventions
 

@@ -1,0 +1,480 @@
+# Jeu d'évaluation : questions indépendantes de semantic/exemples.yaml (jamais montrées au modèle).
+# Chaque requête de référence est exécutée par : python -m netquery.evaluate --check
+#
+# Conventions des réponses de référence :
+#   - « hier », « actuellement », « aujourd'hui » = dernier relevé disponible ;
+#   - « combien de sites » sur une période = sites distincts ; « sites-jours » = une ligne par site et par jour ;
+#   - le parc de sites = toutes les lignes de dim_site.
+# "cles" : colonnes de la référence qui doivent se retrouver dans la réponse (défaut : toutes).
+# "alternatives" : autres requêtes de référence également justes (la réponse doit en égaler une).
+#
+# Corrections après le premier passage (défauts du jeu, pas du modèle) :
+#   t07 remplacée (la réponse de référence valait 0 : en 4G, la voix tombe toujours avec la data) ;
+#   g08 passée du top 3 au top 2 (égalité pour la 3e place) ;
+#   t10 compare seulement les nombres (grouper par jour de la semaine est aussi juste) ;
+#   e09 accepte le comptage par dim_site.
+
+questions:
+
+  # ------------------------------------------------------------------ comptages de pannes
+  - id: p01
+    categorie: pannes
+    question: Combien de sites étaient en panne hier, tous opérateurs confondus ?
+    sql: select count(*) as n from fact_indispo_site where date = (select max(date) from fact_indispo_site)
+
+  - id: p02
+    categorie: pannes
+    question: Combien de sites SFR sont actuellement hors service ?
+    sql: |
+      select count(*) as n from fact_indispo_site
+      where operateur_id = 'SFR' and date = (select max(date) from fact_indispo_site)
+
+  - id: p03
+    categorie: pannes
+    question: Combien de sites Bouygues Telecom différents ont été en panne depuis le 1er novembre 2026 ?
+    sql: |
+      select count(distinct site_id) as n from fact_indispo_site
+      where operateur_id = 'BOUYGUES' and date >= date '2026-11-01'
+
+  - id: p04
+    categorie: pannes
+    question: Combien de sites Free différents ont été en panne au moins un jour sur toute la période disponible ?
+    sql: select count(distinct site_id) as n from fact_indispo_site where operateur_id = 'FREE'
+
+  - id: p05
+    categorie: pannes
+    question: Donne le nombre de sites en panne par opérateur hier.
+    sql: |
+      select operateur_id, count(*) as n from fact_indispo_site
+      where date = (select max(date) from fact_indispo_site) group by operateur_id
+
+  - id: p06
+    categorie: pannes
+    question: Quel opérateur avait le plus de sites en panne hier ?
+    cles: [operateur_id]
+    sql: |
+      select operateur_id, count(*) as n from fact_indispo_site
+      where date = (select max(date) from fact_indispo_site)
+      group by operateur_id order by n desc limit 1
+
+  - id: p07
+    categorie: pannes
+    question: Combien de sites Orange étaient en panne le 15 novembre 2026 ?
+    sql: select count(*) as n from fact_indispo_site where operateur_id = 'ORANGE' and date = date '2026-11-15'
+
+  - id: p08
+    categorie: pannes
+    question: Combien de sites-jours d'indisponibilité SFR y a-t-il eu en novembre 2026 ?
+    sql: |
+      select count(*) as n from fact_indispo_site
+      where operateur_id = 'SFR' and date between date '2026-11-01' and date '2026-11-30'
+
+  - id: p09
+    categorie: pannes
+    question: Combien de sites avaient à la fois la voix et la data hors service hier ?
+    sql: |
+      select count(*) as n from fact_indispo_site
+      where voix_hs and data_hs and date = (select max(date) from fact_indispo_site)
+
+  - id: p10
+    categorie: pannes
+    question: Combien de sites Orange n'avaient plus de service voix hier ?
+    sql: |
+      select count(*) as n from fact_indispo_site
+      where operateur_id = 'ORANGE' and voix_hs and date = (select max(date) from fact_indispo_site)
+
+  # ------------------------------------------------------------------ par technologie et service
+  - id: t01
+    categorie: techno
+    question: Combien de sites avaient la data 4G en panne hier ?
+    sql: |
+      select count(distinct site_id) as n from fact_indispo
+      where service = 'data' and techno = '4G' and est_hs and date = (select max(date) from fact_indispo)
+
+  - id: t02
+    categorie: techno
+    question: Combien de sites Free avaient la 5G en panne hier ?
+    sql: |
+      select count(distinct site_id) as n from fact_indispo
+      where operateur_id = 'FREE' and techno = '5G' and est_hs and date = (select max(date) from fact_indispo)
+
+  - id: t03
+    categorie: techno
+    question: Nombre de sites avec la voix 2G hors service par opérateur hier
+    sql: |
+      select operateur_id, count(distinct site_id) as n from fact_indispo
+      where service = 'voix' and techno = '2G' and est_hs and date = (select max(date) from fact_indispo)
+      group by operateur_id
+
+  - id: t04
+    categorie: techno
+    question: Combien de sites SFR ont eu la 3G en panne depuis le 1er novembre 2026 ?
+    sql: |
+      select count(distinct site_id) as n from fact_indispo
+      where operateur_id = 'SFR' and techno = '3G' and est_hs and date >= date '2026-11-01'
+
+  - id: t05
+    categorie: techno
+    question: Pour chaque technologie, combien de sites avaient au moins un service en panne hier ?
+    sql: |
+      select techno, count(distinct site_id) as n from fact_indispo
+      where est_hs and date = (select max(date) from fact_indispo) group by techno
+
+  - id: t06
+    categorie: techno
+    question: Quelle technologie comptait le plus de sites en panne hier ?
+    cles: [techno]
+    sql: |
+      select techno, count(distinct site_id) as n from fact_indispo
+      where est_hs and date = (select max(date) from fact_indispo)
+      group by techno order by n desc limit 1
+
+  - id: t07
+    categorie: techno
+    question: Combien de sites avaient la voix 3G en panne alors que la voix 4G fonctionnait hier ?
+    sql: |
+      select count(distinct a.site_id) as n
+      from fact_indispo a
+      join fact_indispo b on b.site_id = a.site_id and b.date = a.date
+      where a.date = (select max(date) from fact_indispo)
+        and a.service = 'voix' and a.techno = '3G' and a.est_hs
+        and b.service = 'voix' and b.techno = '4G' and not b.est_hs
+
+  - id: t08
+    categorie: techno
+    question: Combien de sites Orange avaient la 4G en panne hier dans les Bouches-du-Rhône ?
+    sql: |
+      select count(distinct site_id) as n from fact_indispo
+      where operateur_id = 'ORANGE' and techno = '4G' and est_hs and departement = '13'
+        and date = (select max(date) from fact_indispo)
+
+  - id: t09
+    categorie: techno
+    question: Parmi les sites indisponibles hier, combien portaient de la 5G ?
+    sql: |
+      select count(distinct site_id) as n from fact_indispo
+      where techno = '5G' and date = (select max(date) from fact_indispo)
+
+  - id: t10
+    categorie: techno
+    question: Nombre de sites SFR en panne 4G chaque jour de la semaine dernière
+    cles: [n]
+    sql: |
+      select date, count(distinct site_id) as n from fact_indispo
+      where operateur_id = 'SFR' and techno = '4G' and est_hs
+        and date between date_trunc('week', current_date) - interval 7 day
+                     and date_trunc('week', current_date) - interval 1 day
+      group by date
+
+  # ------------------------------------------------------------------ géographie
+  - id: g01
+    categorie: geographie
+    question: Combien de sites étaient en panne hier en Bretagne ?
+    sql: |
+      select count(*) as n from fact_indispo_site f join dim_departement d using (departement)
+      where d.region = 'Bretagne' and f.date = (select max(date) from fact_indispo_site)
+
+  - id: g02
+    categorie: geographie
+    question: Combien de sites étaient en panne hier dans le Rhône ?
+    sql: |
+      select count(*) as n from fact_indispo_site
+      where departement = '69' and date = (select max(date) from fact_indispo_site)
+
+  - id: g03
+    categorie: geographie
+    question: Quels sont les 5 départements qui avaient le plus de sites en panne hier ?
+    cles: [departement]
+    sql: |
+      select departement, count(*) as n from fact_indispo_site
+      where date = (select max(date) from fact_indispo_site)
+      group by departement order by n desc limit 5
+
+  - id: g04
+    categorie: geographie
+    question: Quelle région avait le plus de sites en panne hier ?
+    cles: [region]
+    sql: |
+      select d.region, count(*) as n from fact_indispo_site f join dim_departement d using (departement)
+      where f.date = (select max(date) from fact_indispo_site)
+      group by d.region order by n desc limit 1
+
+  - id: g05
+    categorie: geographie
+    question: Nombre de sites en panne hier pour chaque région
+    sql: |
+      select d.region, count(*) as n from fact_indispo_site f join dim_departement d using (departement)
+      where f.date = (select max(date) from fact_indispo_site) group by d.region
+
+  - id: g06
+    categorie: geographie
+    question: Combien de sites SFR étaient en panne hier à Paris ?
+    sql: |
+      select count(*) as n from fact_indispo_site
+      where operateur_id = 'SFR' and departement = '75' and date = (select max(date) from fact_indispo_site)
+
+  - id: g07
+    categorie: geographie
+    question: Combien de sites étaient en panne hier dans la commune de Lyon ?
+    sql: |
+      select count(*) as n from fact_indispo_site f join dim_commune c using (code_insee)
+      where c.nom = 'Lyon' and f.date = (select max(date) from fact_indispo_site)
+
+  - id: g08
+    categorie: geographie
+    question: Quelles sont les 2 communes de Gironde avec le plus de sites en panne hier ?
+    cles: [nom]
+    sql: |
+      select c.nom, count(*) as n from fact_indispo_site f join dim_commune c using (code_insee)
+      where f.departement = '33' and f.date = (select max(date) from fact_indispo_site)
+      group by c.nom order by n desc limit 2
+
+  - id: g09
+    categorie: geographie
+    question: Combien de sites en panne hier se trouvaient dans des communes de moins de 1000 habitants ?
+    sql: |
+      select count(*) as n from fact_indispo_site f join dim_commune c using (code_insee)
+      where c.population < 1000 and f.date = (select max(date) from fact_indispo_site)
+
+  - id: g10
+    categorie: geographie
+    question: Combien de départements comptaient au moins un site Free en panne hier ?
+    sql: |
+      select count(distinct departement) as n from fact_indispo_site
+      where operateur_id = 'FREE' and date = (select max(date) from fact_indispo_site)
+
+  # ------------------------------------------------------------------ temps
+  - id: d01
+    categorie: temps
+    question: Nombre de sites en panne par jour sur les 7 derniers jours disponibles
+    sql: |
+      select date, count(*) as n from fact_indispo_site
+      where date > (select max(date) from fact_indispo_site) - interval 7 day group by date
+
+  - id: d02
+    categorie: temps
+    question: Quel jour a compté le plus de sites en panne ?
+    cles: [date]
+    sql: select date, count(*) as n from fact_indispo_site group by date order by n desc limit 1
+
+  - id: d03
+    categorie: temps
+    question: Combien de sites Orange étaient en panne en moyenne par jour en novembre 2026 ?
+    sql: |
+      select count(*) / count(distinct date) as n from fact_indispo_site
+      where operateur_id = 'ORANGE' and date between date '2026-11-01' and date '2026-11-30'
+
+  - id: d04
+    categorie: temps
+    question: Nombre moyen de sites en panne par jour de la semaine
+    sql: |
+      select dd.jour_nom, count(*) / count(distinct f.date) as n
+      from fact_indispo_site f join dim_date dd using (date) group by dd.jour_nom
+
+  - id: d05
+    categorie: temps
+    question: Combien de sites différents ont été en panne chaque semaine ISO ?
+    sql: |
+      select dd.semaine_iso, count(distinct f.site_id) as n
+      from fact_indispo_site f join dim_date dd using (date) group by dd.semaine_iso
+
+  - id: d06
+    categorie: temps
+    question: Combien de sites différents ont été en panne le week-end dernier ?
+    sql: |
+      select count(distinct site_id) as n from fact_indispo_site
+      where date between date_trunc('week', current_date) - interval 2 day
+                     and date_trunc('week', current_date) - interval 1 day
+
+  - id: d07
+    categorie: temps
+    question: Combien de sites Bouygues Telecom étaient en panne à la fois le 1er novembre et le 24 novembre 2026 ?
+    sql: |
+      select count(*) as n from (
+          select site_id from fact_indispo_site where operateur_id = 'BOUYGUES' and date = date '2026-11-01'
+          intersect
+          select site_id from fact_indispo_site where operateur_id = 'BOUYGUES' and date = date '2026-11-24'
+      )
+
+  - id: d08
+    categorie: temps
+    question: Quelle est la différence entre le nombre de sites en panne hier et avant-hier ?
+    sql: |
+      select count(*) filter (where date = (select max(date) from fact_indispo_site))
+           - count(*) filter (where date = (select max(date) from fact_indispo_site) - interval 1 day) as n
+      from fact_indispo_site
+
+  # ------------------------------------------------------------------ déploiement (ANFR)
+  - id: e01
+    categorie: deploiement
+    question: Combien d'émetteurs 5G actifs y a-t-il au total ?
+    sql: select count(*) as n from fact_station where techno = '5G' and est_actif
+
+  - id: e02
+    categorie: deploiement
+    question: Combien de sites disposent d'au moins un émetteur 5G actif ?
+    sql: select count(distinct site_id) as n from fact_station where techno = '5G' and est_actif
+
+  - id: e03
+    categorie: deploiement
+    question: Nombre d'émetteurs actifs par technologie
+    sql: select techno, count(*) as n from fact_station where est_actif group by techno
+
+  - id: e04
+    categorie: deploiement
+    question: Combien d'émetteurs Free fonctionnent dans la bande 3500 MHz ?
+    sql: select count(*) as n from fact_station where operateur_id = 'FREE' and bande_mhz = 3500 and est_actif
+
+  - id: e05
+    categorie: deploiement
+    question: Quel opérateur a le plus d'émetteurs 5G actifs ?
+    cles: [operateur_id]
+    sql: |
+      select operateur_id, count(*) as n from fact_station where techno = '5G' and est_actif
+      group by operateur_id order by n desc limit 1
+
+  - id: e06
+    categorie: deploiement
+    question: Nombre d'émetteurs 5G mis en service chaque année
+    sql: |
+      select year(date_mise_service) as annee, count(*) as n from fact_station
+      where techno = '5G' and est_actif and date_mise_service is not null group by annee
+
+  - id: e07
+    categorie: deploiement
+    question: Combien d'émetteurs 4G ont été mis en service en 2026 ?
+    sql: |
+      select count(*) as n from fact_station
+      where techno = '4G' and est_actif and year(date_mise_service) = 2026
+
+  - id: e08
+    categorie: deploiement
+    question: Combien d'émetteurs sont au statut projet approuvé, par opérateur ?
+    sql: select operateur_id, count(*) as n from fact_station where statut = 'Projet approuvé' group by operateur_id
+
+  - id: e09
+    categorie: deploiement
+    question: Combien de sites ont de la 5G active dans le Nord ?
+    sql: |
+      select count(distinct site_id) as n from fact_station
+      where techno = '5G' and est_actif and departement = '59'
+    alternatives:
+      - select count(*) as n from dim_site where a_5g and departement = '59'
+
+  - id: e10
+    categorie: deploiement
+    question: Nombre d'émetteurs Orange actifs par bande de fréquence
+    sql: select bande_mhz, count(*) as n from fact_station where operateur_id = 'ORANGE' and est_actif group by bande_mhz
+
+  - id: e11
+    categorie: deploiement
+    question: Combien d'émetteurs 2G sont encore actifs chez Bouygues Telecom ?
+    sql: select count(*) as n from fact_station where operateur_id = 'BOUYGUES' and techno = '2G' and est_actif
+
+  - id: e12
+    categorie: deploiement
+    question: Combien de sites SFR ont reçu leur première antenne 5G en 2024 ?
+    sql: |
+      select count(*) as n from (
+          select site_id, min(date_mise_service) as d from fact_station
+          where operateur_id = 'SFR' and techno = '5G' and est_actif group by site_id
+      ) where year(d) = 2024
+
+  # ------------------------------------------------------------------ parc de sites
+  - id: s01
+    categorie: parc
+    question: Combien de sites mobiles Orange y a-t-il au total ?
+    sql: select count(*) as n from dim_site where operateur_id = 'ORANGE'
+
+  - id: s02
+    categorie: parc
+    question: Quelle est la hauteur moyenne des supports par opérateur ?
+    sql: select operateur_id, avg(hauteur_m) as n from dim_site group by operateur_id
+
+  - id: s03
+    categorie: parc
+    question: Combien de sites ont un support de plus de 50 mètres de haut ?
+    sql: select count(*) as n from dim_site where hauteur_m > 50
+
+  - id: s04
+    categorie: parc
+    question: Combien de sites Bouygues Telecom ont de la 4G active mais pas de 5G ?
+    sql: select count(*) as n from dim_site where operateur_id = 'BOUYGUES' and a_4g and not a_5g
+
+  - id: s05
+    categorie: parc
+    question: Combien de sites mobiles compte la Haute-Savoie ?
+    sql: select count(*) as n from dim_site where departement = '74'
+
+  - id: s06
+    categorie: parc
+    question: Sur combien de supports différents SFR a-t-il installé des sites ?
+    sql: select count(distinct support_id) as n from dim_site where operateur_id = 'SFR'
+
+  # ------------------------------------------------------------------ ancienneté et causes
+  - id: a01
+    categorie: anciennete
+    question: Combien de sites sont en panne depuis plus de 30 jours ?
+    sql: |
+      select count(*) as n from fact_indispo_site
+      where nb_jours_depuis_debut > 30 and date = (select max(date) from fact_indispo_site)
+
+  - id: a02
+    categorie: anciennete
+    question: Quel site Orange est en panne depuis le plus longtemps ?
+    cles: [site_id]
+    sql: |
+      select site_id, nb_jours_depuis_debut as n from fact_indispo_site
+      where operateur_id = 'ORANGE' and date = (select max(date) from fact_indispo_site)
+      order by nb_jours_depuis_debut desc nulls last limit 1
+
+  - id: a03
+    categorie: anciennete
+    question: Combien de sites étaient en maintenance hier, par opérateur ?
+    sql: |
+      select operateur_id, count(*) as n from fact_indispo_site
+      where raison = 'maintenance' and date = (select max(date) from fact_indispo_site) group by operateur_id
+
+  - id: a04
+    categorie: anciennete
+    question: Quel pourcentage des sites en panne hier l'était à cause d'un incident ?
+    sql: |
+      select 100.0 * count(*) filter (where raison = 'incident') / count(*) as n
+      from fact_indispo_site where date = (select max(date) from fact_indispo_site)
+
+  - id: a05
+    categorie: anciennete
+    question: Depuis combien de jours en moyenne les sites SFR en panne hier étaient-ils coupés ?
+    sql: |
+      select avg(nb_jours_depuis_debut) as n from fact_indispo_site
+      where operateur_id = 'SFR' and date = (select max(date) from fact_indispo_site)
+
+  - id: a06
+    categorie: anciennete
+    question: Combien de sites en panne hier avaient déjà dépassé leur date de fin prévue ?
+    sql: |
+      select count(*) as n from fact_indispo_site
+      where fin_prevue < date and date = (select max(date) from fact_indispo_site)
+
+  # ------------------------------------------------------------------ outre-mer
+  - id: o01
+    categorie: outre-mer
+    question: Combien de sites Free compte la Martinique ?
+    sql: select count(*) as n from dim_site where operateur_id = 'FREE_CARAIBES' and departement = '972'
+
+  - id: o02
+    categorie: outre-mer
+    question: Combien de sites chaque opérateur a-t-il à La Réunion ?
+    sql: select operateur_id, count(*) as n from dim_site where departement = '974' group by operateur_id
+
+  - id: o03
+    categorie: outre-mer
+    question: Combien de sites Orange y a-t-il en outre-mer ?
+    sql: |
+      select count(*) as n from dim_site
+      where operateur_id = 'ORANGE' and (departement like '97%' or departement like '98%')
+
+  - id: o04
+    categorie: outre-mer
+    question: Combien de sites Digicel en Guyane ?
+    sql: select count(*) as n from dim_site where operateur_id = 'DIGICEL' and departement = '973'
