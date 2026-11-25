@@ -100,3 +100,25 @@ def test_connexion_lecture_seule():
     with pytest.raises(duckdb.Error):
         con.execute("set enable_external_access = true")
     con.close()
+
+
+def test_reecriture_dernier_releve():
+    llm = FakeLLM("select count(*) as n from fact_indispo_site where date = (select max(date) from fact_indispo_site)")
+    ans = ask("Combien de sites en panne hier ?", llm=llm)
+    assert ans.ok and ans.cost["reecritures"] == 1
+    assert "max(" not in ans.sql.lower() and "CAST('" in ans.sql
+
+
+def test_cache_des_questions(tmp_path):
+    from netquery.cache import QuestionCache
+
+    cache = QuestionCache(tmp_path / "q.json")
+    llm = FakeLLM("select count(*) as n from fact_indispo_site")
+    a1 = ask("Combien de sites en panne ?", llm=llm, cache=cache)
+    # même question, casse, accents et ponctuation différents : pas de nouvel appel au modèle
+    a2 = ask("combien de SITES en panne", llm=llm, cache=cache)
+    assert a1.ok and a2.ok and a2.from_cache and llm.calls == 1
+    assert a1.df.iloc[0, 0] == a2.df.iloc[0, 0]
+    # question différente : nouvel appel
+    ask("Combien de sites SFR en panne ?", llm=llm, cache=cache)
+    assert llm.calls == 2

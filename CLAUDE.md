@@ -39,7 +39,13 @@ Projet portfolio d'un étudiant en M2 IA, orienté poste de Data Analyst / ingé
   `netquery/evaluate.py` (configs naive / sans_rag / optimise, résultats `eval/results/*.jsonl`, rapport
   `eval/rapport.md`). Résultats : 29 % / 62 % / 67 %. Ne pas ajuster le prompt sur les échecs de ce jeu
   (ce serait optimiser sur le test) : créer un nouveau jeu pour valider une amélioration.
-- Prochaine étape : cloud et coûts (étape 7, BigQuery), nécessite un projet GCP créé par l'utilisateur.
+- Étape 7 faite : projet GCP `netquery-515813` en bac à sable BigQuery (pas de facturation : tous les comptes
+  de facturation de l'utilisateur sont clôturés ; tables et partitions expirent après 60 jours, relancer
+  `scripts/load_bigquery.py`). gcloud : `%LOCALAPPDATA%\Google\Cloud SDK\google-cloud-sdkin\gcloud.cmd`.
+  `bigquery_backend.py` (sqlglot, ISOWEEK, dry run, BQ_MAX_BYTES), `optimize.py` (sous-requête max(date) ->
+  date explicite, sinon pas d'élimination de partitions), `cache.py` (cache exact ; pas de cache sémantique).
+  `NETQUERY_BACKEND=duckdb|bigquery`. Mesure des octets : `measure_bigquery()` dans evaluate.py.
+- Prochaine étape : bonus (étape 9) : questions de suivi, clarification, carte.
 
 ## Conventions
 

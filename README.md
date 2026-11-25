@@ -95,7 +95,8 @@ netquery/
 ├── requirements.txt
 ├── scripts/
 │   ├── ingest.py          # téléchargement + chargement DuckDB + profil du schéma
-│   └── transform.py       # raw -> staging -> modèle, puis contrôles qualité
+│   ├── transform.py       # raw -> staging -> modèle, puis contrôles qualité
+│   └── load_bigquery.py   # chargement du modèle dans BigQuery (partitions, clustering)
 ├── sql/
 │   ├── staging/           # stg_ : typage, nettoyage, normalisation
 │   └── model/             # dim_, fact_, agg_
@@ -110,6 +111,9 @@ netquery/
 │   ├── llm.py             # client générique (API compatible OpenAI, Ollama par défaut)
 │   ├── sql_guard.py       # garde-fous : SELECT seul, tables autorisées, LIMIT, lecture seule, timeout
 │   ├── pipeline.py        # question -> SQL -> résultat
+│   ├── bigquery_backend.py # traduction DuckDB -> BigQuery, dry run, seuil de coût
+│   ├── optimize.py        # réécritures de coût (dernier relevé en date explicite)
+│   ├── cache.py           # cache des questions déjà posées
 │   └── evaluate.py        # évaluation : exactitude, latence, tokens, rapport
 ├── eval/
 │   ├── questions.yaml     # 66 questions de test avec leur SQL de référence (jamais montrées au modèle)
@@ -200,6 +204,10 @@ python -m netquery.pipeline "Combien de sites SFR étaient en panne 4G dans le R
 # interface web
 streamlit run app.py
 
+# exécuter sur BigQuery plutôt que DuckDB : NETQUERY_BACKEND=bigquery dans .env
+# (prérequis : gcloud auth application-default login, GCP_PROJECT dans .env)
+python scripts/load_bigquery.py
+
 # tests
 python -m pytest
 
@@ -257,7 +265,7 @@ python -c "import duckdb; print(duckdb.connect('data/netquery.duckdb').sql('SHOW
 - [x] **4. MVP text-to-SQL** : prompt + génération + exécution sur DuckDB, interface Streamlit.
 - [x] **5. Garde-fous** : validation sqlglot, lecture seule, `LIMIT`, timeout, boucle d'auto-correction.
 - [x] **6. RAG** : sélection des tables pertinentes, exemples few-shot dynamiques.
-- [ ] **7. Cloud et coûts** : chargement dans BigQuery (partition par date, clustering par opérateur et département), dry run, seuil de coût, routage vers les tables `agg_`, cache du SQL normalisé, cache sémantique.
+- [x] **7. Cloud et coûts** : chargement dans BigQuery (partition par date, clustering par opérateur et département), dry run, seuil de coût, routage vers les tables `agg_`, cache du SQL normalisé, cache sémantique.
 - [x] **8. Évaluation** : 60 à 80 questions avec le SQL attendu ; comparaison version naïve / version optimisée.
 - [ ] **9. Bonus** : questions de suivi, demande de clarification si la question est ambiguë, carte des résultats.
 
@@ -304,7 +312,51 @@ passage, 4 questions du jeu ont été corrigées parce que leur référence éta
 optimiser sur le jeu de test. Les pistes d'amélioration (exemples temporels, consigne contre la recopie
 de filtres, modèle plus grand) devront être validées sur un nouveau jeu.
 
-Les colonnes « octets scannés » et « coût » seront mesurées sur BigQuery (étape 7).
+## BigQuery et coûts
+
+Le modèle est chargé dans BigQuery (`python scripts/load_bigquery.py`) : les tables d'indisponibilité sont
+partitionnées par jour et regroupées (clustering) par opérateur et département. Les requêtes générées restent
+écrites en SQL DuckDB et validées par les mêmes garde-fous, puis :
+
+1. traduites en SQL BigQuery par sqlglot. Les 86 requêtes de référence et d'exemple donnent exactement
+   le même résultat sur BigQuery et sur DuckDB, après correction de deux pièges : `WEEK` commence le dimanche
+   en BigQuery (le lundi en DuckDB, d'où `ISOWEEK`) et les horodatages reviennent en UTC ;
+2. estimées par un **dry run** (gratuit) : refus au-delà de `BQ_MAX_BYTES`, et `maximum_bytes_billed`
+   pour que BigQuery annule lui-même un job qui dépasserait ;
+3. **réécrites** : le modèle écrit « hier » sous la forme `date = (select max(date) from ...)`, or un filtre
+   de partition calculé par une sous-requête n'élimine aucune partition. La sous-requête est remplacée par la
+   date du dernier relevé avant exécution (résultat identique sur les 64 requêtes concernées) :
+
+| Requête « sites en panne hier dans le Rhône » | Octets lus |
+|---|---|
+| `date = (select max(date) ...)` | 500 Ko |
+| date explicite (partition éliminée) | 18 Ko |
+| table agrégée + date explicite | 6 Ko |
+| sans aucun filtre de date | 167 Ko |
+
+Octets lus estimés sur les 66 questions d'évaluation (dry run) :
+
+| Version | Mo lus (moyenne) | Mo lus (médiane) |
+|---|---|---|
+| Requêtes de référence écrites à la main | 3,6 | 1,1 |
+| Naïve | 6,9 | 4,4 |
+| Optimisée | 3,9 | 1,2 |
+| Optimisée + réécriture du dernier relevé | **3,1** | **0,5** |
+
+A cette échelle (environ 100 Mo de données), le coût facturé reste négligeable (moins de 0,1 USD pour
+1 000 questions) car BigQuery facture au minimum 10 Mo par table lue. L'intérêt est ailleurs : avec la
+sous-requête, les octets lus croissent avec l'historique accumulé ; avec la date explicite et les partitions,
+ils restent constants.
+
+**Cache.** Le coût dominant est la génération (environ 15 s par question sur CPU). Une question déjà posée
+(même texte, à la casse, aux accents et à la ponctuation près) réutilise son SQL validé sans appeler le LLM :
+38 s puis 3 s sur un essai, le second passage profitant aussi du cache de résultats de BigQuery (non facturé).
+Pas de cache sémantique : avec les embeddings du projet, « sites en panne 4G hier » et « sites en panne 5G hier »
+sont plus proches (cosinus 0,868) que deux vraies reformulations d'une même question (0,861) ; un seuil de
+similarité renverrait la réponse d'une autre question.
+
+Le projet tourne dans le **bac à sable BigQuery** (sans facturation) : tables et partitions expirent après
+60 jours, il suffit de relancer le chargement.
 
 ## Exemples de questions
 

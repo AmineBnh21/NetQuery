@@ -1,12 +1,27 @@
 # Rapport d'évaluation
 
-Généré le 2026-11-25 13:55, 66 questions (`eval/questions.yaml`), modèle local via Ollama.
+Généré le 2026-11-25 14:44, 66 questions (`eval/questions.yaml`), modèle local via Ollama.
 
 | Version | Questions | Exactitude | Latence moyenne | Latence médiane | Tokens prompt moyens | Questions corrigées |
 |---|---|---|---|---|---|---|
 | naive | 66 | **29 %** | 16.3 s | 12.9 s | 2732 | 0 |
 | sans_rag | 66 | **62 %** | 13.9 s | 12.3 s | 1278 | 4 |
 | optimise | 66 | **67 %** | 17.0 s | 15.8 s | 1285 | 3 |
+
+## Coût sur BigQuery (dry run)
+
+Octets lus estimés par BigQuery pour chaque requête générée ; facturé = avec le minimum de 10 Mo par table lue ; coût au tarif à la demande (6,25 USD par Tio).
+
+| Version | Requêtes estimées | Mo lus (moyenne) | Mo lus (médiane) | Mo facturés (moyenne) | Coût pour 1000 questions |
+|---|---|---|---|---|---|
+| reference | 66 | 3.6 | 1.1 | 12.4 | 0.070 USD |
+| reference_reecrit | 66 | 2.7 | 0.4 | 12.4 | 0.070 USD |
+| naive | 45 | 6.9 | 4.4 | 17.6 | 0.100 USD |
+| sans_rag | 65 | 4.1 | 1.2 | 13.4 | 0.076 USD |
+| optimise | 66 | 3.9 | 1.2 | 13.1 | 0.075 USD |
+| naive_reecrit | 45 | 5.5 | 2.2 | 17.6 | 0.100 USD |
+| sans_rag_reecrit | 65 | 3.3 | 0.6 | 13.4 | 0.076 USD |
+| optimise_reecrit | 66 | 3.1 | 0.5 | 13.1 | 0.075 USD |
 
 ## Exactitude par catégorie
 

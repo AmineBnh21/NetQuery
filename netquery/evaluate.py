@@ -83,6 +83,8 @@ def _norm(v):
         r = round(float(v), 1)
         return int(r) if r.is_integer() else r
     if isinstance(v, (pd.Timestamp, dt.datetime)):
+        if v.tzinfo is not None:  # BigQuery renvoie des horodatages UTC explicites, DuckDB naïfs
+            v = v.astimezone(dt.timezone.utc).replace(tzinfo=None)
         return v.date().isoformat() if v.time() == dt.time(0) else v.isoformat()
     if isinstance(v, dt.date):
         return v.isoformat()
@@ -191,6 +193,60 @@ def run_config(config: str, questions: list[Question], restart: bool = False) ->
 
 # --------------------------------------------------------------------------- rapport
 
+# --------------------------------------------------------------------------- coût sur BigQuery
+
+def bq_path(config: str) -> Path:
+    return RESULTS_DIR / f"{config}_bigquery.jsonl"
+
+
+def measure_bigquery(config: str, rewrite: bool = False) -> None:
+    """Dry run BigQuery de chaque requête générée (gratuit, rien n'est exécuté) : octets lus et coût.
+    config 'reference' mesure les requêtes de référence écrites à la main.
+    rewrite=True applique d'abord la réécriture « dernier relevé » (résultats enregistrés sous <config>_reecrit)."""
+    from netquery import bigquery_backend as bq
+    from netquery.optimize import rewrite_latest_date
+
+    if config == "reference":
+        items = [(q.id, q.sql, True) for q in load_questions()]
+    else:
+        items = [(r["id"], r["sql"], r["correct"]) for r in load_records(config) if r["sql"]]
+    out = []
+    for id_, sql, correct in items:
+        rec = {"id": id_, "correct": correct}
+        try:
+            checked = validate(sql)
+            if rewrite:
+                checked, _ = rewrite_latest_date(checked)
+            est = bq.estimate(checked)
+            rec.update(bytes_processed=est.bytes_processed, bytes_billed=est.bytes_billed,
+                       cost_usd=est.cost_usd, tables=est.tables)
+        except Exception as e:  # noqa: BLE001 - SQL invalide : pas de coût mesurable
+            rec["error"] = str(e).splitlines()[0][:200]
+        out.append(rec)
+    name = f"{config}_reecrit" if rewrite else config
+    bq_path(name).write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in out), encoding="utf-8")
+    ok = [r for r in out if "bytes_processed" in r]
+    print(f"[{name}] {len(ok)}/{len(out)} requêtes estimées, "
+          f"{sum(r['bytes_processed'] for r in ok) / 1e6:.0f} Mo lus au total")
+
+
+def _bq_summary(config: str) -> dict | None:
+    p = bq_path(config)
+    if not p.exists():
+        return None
+    rs = [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()]
+    ok = [r for r in rs if "bytes_processed" in r]
+    if not ok:
+        return None
+    return {
+        "n": len(ok),
+        "mo_moy": statistics.mean(r["bytes_processed"] for r in ok) / 1e6,
+        "mo_med": statistics.median(r["bytes_processed"] for r in ok) / 1e6,
+        "mo_facture_moy": statistics.mean(r["bytes_billed"] for r in ok) / 1e6,
+        "cout_1000": 1000 * statistics.mean(r["cost_usd"] for r in ok),
+    }
+
+
 def _summary(records: list[dict]) -> dict:
     n = len(records)
     lat = [r["total_s"] for r in records]
@@ -219,6 +275,19 @@ def write_report(configs: list[str] | None = None) -> str:
         s = _summary(by_conf[c])
         lines.append(f"| {c} | {s['n']} | **{100 * s['exactitude']:.0f} %** | {s['latence_moy']:.1f} s | "
                      f"{s['latence_med']:.1f} s | {s['tokens_moy']:.0f} | {s['corrections']} |")
+
+    bq_rows = [(c, _bq_summary(c)) for c in ["reference", "reference_reecrit", *configs,
+                                              *[f"{c}_reecrit" for c in configs]]]
+    if any(s for _, s in bq_rows):
+        lines += ["", "## Coût sur BigQuery (dry run)", "",
+                  "Octets lus estimés par BigQuery pour chaque requête générée ; facturé = avec le minimum de "
+                  "10 Mo par table lue ; coût au tarif à la demande (6,25 USD par Tio).", "",
+                  "| Version | Requêtes estimées | Mo lus (moyenne) | Mo lus (médiane) | Mo facturés (moyenne) | Coût pour 1000 questions |",
+                  "|---|---|---|---|---|---|"]
+        for c, s in bq_rows:
+            if s:
+                lines.append(f"| {c} | {s['n']} | {s['mo_moy']:.1f} | {s['mo_med']:.1f} | "
+                             f"{s['mo_facture_moy']:.1f} | {s['cout_1000']:.3f} USD |")
 
     cats = sorted({q.categorie for q in questions.values()})
     lines += ["", "## Exactitude par catégorie", "",

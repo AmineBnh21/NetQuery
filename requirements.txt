@@ -8,3 +8,5 @@ openai>=1.40
 python-dotenv>=1.0
 streamlit>=1.38
 pytest>=8
+google-cloud-bigquery>=3.25
+db-dtypes>=1.3

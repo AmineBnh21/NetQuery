@@ -10,7 +10,8 @@ import pandas as pd
 import streamlit as st
 
 from netquery.llm import LLM
-from netquery.pipeline import ask
+from netquery.cache import QuestionCache
+from netquery.pipeline import BACKEND, ask
 
 EXEMPLES = [
     "Combien de sites SFR étaient en panne 4G dans le Rhône la semaine dernière ?",
@@ -29,6 +30,11 @@ st.caption("Interroger les données des réseaux mobiles français en langage na
 @st.cache_resource
 def get_llm() -> LLM:
     return LLM()
+
+
+@st.cache_resource
+def get_cache() -> QuestionCache:
+    return QuestionCache()
 
 
 def show_chart(df: pd.DataFrame) -> None:
@@ -64,14 +70,14 @@ with st.sidebar:
             st.session_state["question"] = ex
     llm = get_llm()
     st.divider()
-    st.caption(f"Modèle : `{llm.model}`  \nServeur : `{llm.base_url}`")
+    st.caption(f"Modèle : `{llm.model}`  \nServeur : `{llm.base_url}`  \nExécution : `{BACKEND}`")
 
 question = st.text_input("Votre question", key="question",
                          placeholder="Ex. combien de sites Orange en panne hier dans le Nord ?")
 
 if question:
     with st.spinner("Génération et exécution de la requête..."):
-        ans = ask(question, llm=llm)
+        ans = ask(question, llm=llm, cache=get_cache())
 
     if ans.ok:
         n = len(ans.df)
@@ -97,9 +103,13 @@ if question:
                     st.code(a.sql, language="sql")
     t = ans.timings
     st.caption(
-        f"Tables fournies au modèle : {', '.join(ans.prompt.tables)} · "
-        f"prompt ≈ {ans.prompt.size_chars // 4} tokens · "
-        f"LLM {t.get('llm_s', 0):.1f} s · exécution {t.get('exec_s', 0) * 1000:.0f} ms"
+        ("SQL repris du cache (pas d'appel au modèle) · " if ans.from_cache else
+         f"Tables fournies au modèle : {', '.join(ans.prompt.tables)} · "
+         f"prompt ≈ {ans.prompt.size_chars // 4} tokens · LLM {t.get('llm_s', 0):.1f} s · ")
+        + f"exécution {t.get('exec_s', 0) * 1000:.0f} ms"
+        + (f" · BigQuery : {ans.cost['bytes_processed'] / 1e6:.2f} Mo lus"
+           + (" (cache BigQuery)" if ans.cost.get("cache_hit") else "")
+           if "bytes_processed" in ans.cost else "")
     )
     with st.expander("Détails (prompt et réponse brute)"):
         for m in ans.prompt.messages:

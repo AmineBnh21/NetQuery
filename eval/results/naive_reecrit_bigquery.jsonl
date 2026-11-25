@@ -1,0 +1,66 @@
+{"id": "p01", "correct": true, "bytes_processed": 31413, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "p02", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Name est_hs not found inside fact_indispo_site at [8:25]"}
+{"id": "p03", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Unrecognized name: est_hs at [12:5]"}
+{"id": "p04", "correct": false, "bytes_processed": 5252099, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_operateur", "fact_indispo"]}
+{"id": "p05", "correct": false, "bytes_processed": 55431, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "p06", "correct": true, "bytes_processed": 59124, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "p07", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Column name site_id is ambiguous at [2:18]"}
+{"id": "p08", "correct": false, "bytes_processed": 882609, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "p09", "correct": false, "bytes_processed": 211052, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["fact_indispo", "fact_indispo_site"]}
+{"id": "p10", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Column name site_id is ambiguous at [2:18]"}
+{"id": "t01", "correct": true, "bytes_processed": 211052, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["fact_indispo", "fact_indispo_site"]}
+{"id": "t02", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Column name site_id is ambiguous at [2:18]"}
+{"id": "t03", "correct": true, "bytes_processed": 264230, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo"]}
+{"id": "t04", "correct": false, "bytes_processed": 4559470, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo"]}
+{"id": "t05", "correct": true, "bytes_processed": 223868, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo"]}
+{"id": "t06", "correct": true, "bytes_processed": 80724, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo"]}
+{"id": "t08", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Column name site_id is ambiguous at [3:20]"}
+{"id": "t09", "correct": true, "bytes_processed": 163963, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo"]}
+{"id": "g01", "correct": false, "bytes_processed": 53364, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "g02", "correct": false, "bytes_processed": 65253, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "g03", "correct": true, "bytes_processed": 2279167, "bytes_billed": 31457280, "cost_usd": 0.00017881393432617188, "tables": ["dim_departement", "dim_site", "fact_indispo_site"]}
+{"id": "g04", "correct": true, "bytes_processed": 2386552, "bytes_billed": 31457280, "cost_usd": 0.00017881393432617188, "tables": ["dim_departement", "dim_site", "fact_indispo"]}
+{"id": "g05", "correct": false, "bytes_processed": 2393279, "bytes_billed": 31457280, "cost_usd": 0.00017881393432617188, "tables": ["dim_departement", "dim_site", "fact_indispo"]}
+{"id": "g06", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Column name site_id is ambiguous at [3:20]"}
+{"id": "g07", "correct": false, "bytes_processed": 57959, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "g09", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Unrecognized name: est_hs; Did you mean data_hs? at [7:67]"}
+{"id": "g10", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Column name operateur_id is ambiguous at [9:3]"}
+{"id": "d01", "correct": false, "bytes_processed": 1277883, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_date", "fact_indispo_site"]}
+{"id": "d02", "correct": true, "bytes_processed": 857046, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "d03", "correct": false, "bytes_processed": 844613, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["agg_indispo_dept_jour"]}
+{"id": "d04", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Unrecognized name: jour_semaine at [5:3]"}
+{"id": "d05", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Unrecognized name: semaine_iso at [16:3]"}
+{"id": "d06", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Unrecognized name: jour_semaine at [6:7]"}
+{"id": "d07", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Unrecognized name: date at [21:7]"}
+{"id": "d08", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Unrecognized name: nb_sites_indispo_hier; Did you mean nb_sites_indispo? at [36:7]"}
+{"id": "e01", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Unrecognized name: a_5g at [5:3]"}
+{"id": "e02", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Unrecognized name: a_5g at [5:3]"}
+{"id": "e03", "correct": true, "bytes_processed": 4080200, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_station"]}
+{"id": "e04", "correct": false, "bytes_processed": 17436359, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_operateur", "fact_station"]}
+{"id": "e05", "correct": false, "bytes_processed": 16653609, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_operateur", "fact_station"]}
+{"id": "e06", "correct": true, "bytes_processed": 10058064, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_station"]}
+{"id": "e07", "correct": false, "bytes_processed": 28106114, "bytes_billed": 28106114, "cost_usd": 0.00015976476106516202, "tables": ["fact_station"]}
+{"id": "e08", "correct": true, "bytes_processed": 24908938, "bytes_billed": 24908938, "cost_usd": 0.00014159091961118975, "tables": ["dim_operateur", "fact_station"]}
+{"id": "e10", "correct": true, "bytes_processed": 19917305, "bytes_billed": 19917305, "cost_usd": 0.00011321677106934658, "tables": ["fact_station"]}
+{"id": "e11", "correct": true, "bytes_processed": 16653145, "bytes_billed": 16653145, "cost_usd": 9.466216965847707e-05, "tables": ["fact_station"]}
+{"id": "e12", "correct": false, "bytes_processed": 25971903, "bytes_billed": 31457280, "cost_usd": 0.00017881393432617188, "tables": ["dim_date", "dim_operateur", "fact_station"]}
+{"id": "s01", "correct": false, "bytes_processed": 15837569, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_operateur", "fact_station"]}
+{"id": "s02", "correct": false, "bytes_processed": 2159248, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_operateur", "dim_site"]}
+{"id": "s03", "correct": true, "bytes_processed": 2799399, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["dim_site"]}
+{"id": "s04", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Name a_4g not found inside fact_station at [8:20]"}
+{"id": "s05", "correct": true, "bytes_processed": 2248892, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_departement", "dim_site"]}
+{"id": "s06", "correct": true, "bytes_processed": 15837569, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_operateur", "fact_station"]}
+{"id": "a01", "correct": false, "bytes_processed": 830454, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "a02", "correct": false, "bytes_processed": 6913109, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo"]}
+{"id": "a03", "correct": false, "bytes_processed": 1943200, "bytes_billed": 31457280, "cost_usd": 0.00017881393432617188, "tables": ["dim_operateur", "dim_site", "fact_indispo"]}
+{"id": "a04", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Name nb_sites_pannes not found inside sites_pannes_incident at [18:30]"}
+{"id": "a05", "correct": false, "bytes_processed": 59124, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "a06", "correct": false, "bytes_processed": 40205, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "o01", "correct": false, "bytes_processed": 4515747, "bytes_billed": 41943040, "cost_usd": 0.0002384185791015625, "tables": ["dim_commune", "dim_departement", "dim_operateur", "dim_site"]}
+{"id": "o02", "correct": false, "bytes_processed": 3290422, "bytes_billed": 31457280, "cost_usd": 0.00017881393432617188, "tables": ["dim_departement", "dim_operateur", "dim_site"]}
+{"id": "o03", "correct": false, "bytes_processed": 2724699, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_operateur", "dim_site"]}
+{"id": "o04", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Name code_departement not found inside dim_departement at [9:53]"}
+{"id": "t07", "correct": true, "bytes_processed": 211052, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo"]}
+{"id": "t10", "correct": false, "bytes_processed": 1334983, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo"]}
+{"id": "g08", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Name code_insee not found inside d at [3:7]"}
+{"id": "e09", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Column name site_id is ambiguous at [2:18]"}

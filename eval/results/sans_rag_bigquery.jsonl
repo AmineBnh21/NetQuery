@@ -1,0 +1,66 @@
+{"id": "p01", "correct": true, "bytes_processed": 333352, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "p02", "correct": true, "bytes_processed": 653874, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "p03", "correct": false, "bytes_processed": 1150976, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "p04", "correct": true, "bytes_processed": 844216, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "p05", "correct": true, "bytes_processed": 653874, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "p06", "correct": true, "bytes_processed": 653874, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "p07", "correct": true, "bytes_processed": 17643, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "p08", "correct": true, "bytes_processed": 489681, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "p09", "correct": false, "bytes_processed": 4929681, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo"]}
+{"id": "p10", "correct": false, "bytes_processed": 692175, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "t01", "correct": true, "bytes_processed": 5648657, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo"]}
+{"id": "t02", "correct": true, "bytes_processed": 5970611, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo"]}
+{"id": "t03", "correct": true, "bytes_processed": 7049075, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo"]}
+{"id": "t04", "correct": true, "bytes_processed": 4559470, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo"]}
+{"id": "t05", "correct": false, "bytes_processed": 937001, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "t06", "correct": false, "bytes_processed": 413307, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "t08", "correct": true, "bytes_processed": 6691355, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_departement", "fact_indispo"]}
+{"id": "t09", "correct": true, "bytes_processed": 4390449, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo"]}
+{"id": "g01", "correct": true, "bytes_processed": 502244, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_departement", "fact_indispo_site"]}
+{"id": "g02", "correct": false, "bytes_processed": 820584, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "g03", "correct": true, "bytes_processed": 501639, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_departement", "fact_indispo_site"]}
+{"id": "g04", "correct": true, "bytes_processed": 502244, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_departement", "fact_indispo_site"]}
+{"id": "g05", "correct": false, "bytes_processed": 502244, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_departement", "fact_indispo_site"]}
+{"id": "g06", "correct": true, "bytes_processed": 820584, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "g07", "correct": true, "bytes_processed": 1361898, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_commune", "fact_indispo_site"]}
+{"id": "g09", "correct": false, "bytes_processed": 1150491, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_commune", "fact_indispo_site"]}
+{"id": "g10", "correct": true, "bytes_processed": 821023, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_departement", "fact_indispo_site"]}
+{"id": "d01", "correct": true, "bytes_processed": 73776, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "d02", "correct": true, "bytes_processed": 857046, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "d03", "correct": true, "bytes_processed": 489681, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "d04", "correct": false, "bytes_processed": 552472, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_date", "fact_indispo_site"]}
+{"id": "d05", "correct": false, "bytes_processed": 653874, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "d06", "correct": false, "bytes_processed": 980301, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_date", "fact_indispo_site"]}
+{"id": "d07", "correct": false, "bytes_processed": 0, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "d08", "correct": false, "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/netquery-515813/jobs?prettyPrint=false: Unrecognized name: nb_sites_hier at [25:3]"}
+{"id": "e01", "correct": true, "bytes_processed": 4080200, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_station"]}
+{"id": "e02", "correct": true, "bytes_processed": 13872680, "bytes_billed": 13872680, "cost_usd": 7.885705599619541e-05, "tables": ["fact_station"]}
+{"id": "e03", "correct": true, "bytes_processed": 4080200, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_station"]}
+{"id": "e04", "correct": false, "bytes_processed": 12572945, "bytes_billed": 12572945, "cost_usd": 7.146891789489018e-05, "tables": ["fact_station"]}
+{"id": "e05", "correct": true, "bytes_processed": 10124825, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_station"]}
+{"id": "e06", "correct": false, "bytes_processed": 20069664, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_date", "fact_station"]}
+{"id": "e07", "correct": true, "bytes_processed": 21577794, "bytes_billed": 21577794, "cost_usd": 0.000122655558243423, "tables": ["fact_station"]}
+{"id": "e08", "correct": false, "bytes_processed": 19196435, "bytes_billed": 19196435, "cost_usd": 0.00010911909953392751, "tables": ["fact_station"]}
+{"id": "e10", "correct": true, "bytes_processed": 13388985, "bytes_billed": 13388985, "cost_usd": 7.610756824760756e-05, "tables": ["fact_station"]}
+{"id": "e11", "correct": true, "bytes_processed": 10124825, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_station"]}
+{"id": "e12", "correct": true, "bytes_processed": 26114289, "bytes_billed": 26114289, "cost_usd": 0.00014844254678791913, "tables": ["dim_date", "fact_station"]}
+{"id": "s01", "correct": true, "bytes_processed": 1042041, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["dim_site"]}
+{"id": "s02", "correct": false, "bytes_processed": 2298981, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["dim_site"]}
+{"id": "s03", "correct": true, "bytes_processed": 2799399, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["dim_site"]}
+{"id": "s04", "correct": true, "bytes_processed": 3004368, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["dim_site"]}
+{"id": "s05", "correct": true, "bytes_processed": 564900, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["dim_site"]}
+{"id": "s06", "correct": false, "bytes_processed": 16653145, "bytes_billed": 16653145, "cost_usd": 9.466216965847707e-05, "tables": ["fact_station"]}
+{"id": "a01", "correct": false, "bytes_processed": 306760, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "a02", "correct": false, "bytes_processed": 1150976, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "a03", "correct": true, "bytes_processed": 1074711, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "a04", "correct": false, "bytes_processed": 754189, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "a05", "correct": true, "bytes_processed": 960634, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "a06", "correct": true, "bytes_processed": 565000, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo_site"]}
+{"id": "o01", "correct": true, "bytes_processed": 1606941, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["dim_site"]}
+{"id": "o02", "correct": false, "bytes_processed": 1606941, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["dim_site"]}
+{"id": "o03", "correct": false, "bytes_processed": 3289356, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["dim_site"]}
+{"id": "o04", "correct": true, "bytes_processed": 1606941, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["dim_site"]}
+{"id": "t07", "correct": false, "bytes_processed": 7049075, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["fact_indispo"]}
+{"id": "t10", "correct": false, "bytes_processed": 6305159, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_date", "fact_indispo"]}
+{"id": "g08", "correct": true, "bytes_processed": 1502349, "bytes_billed": 20971520, "cost_usd": 0.00011920928955078125, "tables": ["dim_commune", "fact_indispo_site"]}
+{"id": "e09", "correct": true, "bytes_processed": 704856, "bytes_billed": 10485760, "cost_usd": 5.9604644775390625e-05, "tables": ["dim_site"]}

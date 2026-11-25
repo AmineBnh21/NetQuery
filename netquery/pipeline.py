@@ -9,6 +9,7 @@ Usage :
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 import time
@@ -17,8 +18,10 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from netquery.llm import LLM, ChatModel
+from netquery.cache import QuestionCache, question_key
+from netquery.optimize import latest_date, rewrite_latest_date
 from netquery.prompt import Prompt, build_prompt
-from netquery.sql_guard import UnsafeSQLError, execute, validate
+from netquery.sql_guard import MAX_ROWS, UnsafeSQLError, execute, validate
 
 
 @dataclass
@@ -34,6 +37,8 @@ class Answer:
     timings: dict[str, float] = field(default_factory=dict)
     tokens: dict[str, int | None] = field(default_factory=dict)
     attempts: list = field(default_factory=list)   # un Attempt par appel au modèle
+    cost: dict = field(default_factory=dict)       # octets lus, coût (BigQuery), réécritures appliquées
+    from_cache: bool = False                       # SQL repris du cache, sans appel au LLM
 
     @property
     def ok(self) -> bool:
@@ -108,31 +113,68 @@ class Attempt:
     error_kind: str | None
 
 
-def _try_once(text: str) -> tuple[str | None, pd.DataFrame | None, bool, float, str | None, str | None]:
-    """Extraction, garde-fous, exécution. Renvoie (sql, df, tronqué, durée, erreur, type d'erreur)."""
+BACKEND = os.getenv("NETQUERY_BACKEND", "duckdb").lower()   # duckdb (local) ou bigquery
+
+
+def _try_once(text: str, backend: str = BACKEND) -> dict:
+    """Extraction, garde-fous, réécriture de coût, exécution sur le moteur choisi."""
+    out = {"sql": None, "df": None, "truncated": False, "exec_s": 0.0, "error": None, "kind": None, "cost": {}}
     try:
         sql = extract_sql(text)
     except ValueError as e:
-        return None, None, False, 0.0, str(e), "extraction"
+        return out | {"error": str(e), "kind": "extraction"}
     try:
         checked = validate(sql)
     except UnsafeSQLError as e:
-        return sql, None, False, 0.0, f"requête refusée : {e}", "securite"
+        return out | {"sql": sql, "error": f"requête refusée : {e}", "kind": "securite"}
+    checked, n_rewrites = rewrite_latest_date(checked)
+    out["sql"] = checked.sql
+    out["cost"]["reecritures"] = n_rewrites
     try:
-        res = execute(checked)
-    except Exception as e:  # noqa: BLE001 - erreur SQL, délai dépassé
-        return checked.sql, None, False, 0.0, f"erreur d'exécution : {e}", "execution"
-    return checked.sql, res.df, res.truncated, res.elapsed_s, None, None
+        if backend == "bigquery":
+            from netquery import bigquery_backend as bq
+
+            res = bq.execute(checked)
+            out["cost"].update(bytes_processed=res.estimate.bytes_processed, bytes_billed=res.estimate.bytes_billed,
+                               cost_usd=res.estimate.cost_usd, cache_hit=res.cache_hit, sql_bigquery=res.estimate.sql)
+            truncated = len(res.df) >= MAX_ROWS
+        else:
+            res = execute(checked)
+            truncated = res.truncated
+    except Exception as e:  # noqa: BLE001 - erreur SQL, délai dépassé, coût trop élevé
+        from netquery.bigquery_backend import CostLimitError
+        kind = "cout" if isinstance(e, CostLimitError) else "execution"
+        return out | {"error": f"erreur d'exécution : {e}" if kind == "execution" else f"requête refusée : {e}",
+                      "kind": kind}
+    return out | {"df": res.df, "truncated": truncated, "exec_s": res.elapsed_s}
 
 
 def ask(question: str, llm: ChatModel | None = None, max_retries: int = MAX_RETRIES,
-        use_rag: bool = True, naive: bool = False) -> Answer:
+        use_rag: bool = True, naive: bool = False, backend: str | None = None,
+        cache: QuestionCache | None = None) -> Answer:
+    """cache : si fourni, une question déjà posée réutilise son SQL validé sans appeler le LLM."""
     t0 = time.perf_counter()
+    backend = backend or BACKEND
     prompt = build_prompt(question, use_rag=use_rag, naive=naive)
     ans = Answer(question=question, prompt=prompt)
     ans.timings["prompt_s"] = time.perf_counter() - t0
     ans.timings["llm_s"] = 0.0
     messages = list(prompt.messages)
+
+    key = None
+    if cache is not None:
+        llm = llm or LLM()
+        key = question_key(question, getattr(llm, "model", "inconnu"), latest_date().isoformat())
+        cached = cache.get(key)
+        if cached:
+            r = _try_once(f"```sql\n{cached}\n```", backend=backend)
+            if r["error"] is None:
+                ans.sql, ans.df, ans.truncated, ans.cost = r["sql"], r["df"], r["truncated"], r["cost"]
+                ans.from_cache = True
+                ans.timings["exec_s"] = r["exec_s"]
+                ans.timings["total_s"] = time.perf_counter() - t0
+                return ans
+            cache.drop(key)  # SQL devenu invalide (modèle de données modifié) : on régénère
 
     for attempt in range(max_retries + 1):
         # 1. génération (ou correction)
@@ -148,13 +190,18 @@ def ask(question: str, llm: ChatModel | None = None, max_retries: int = MAX_RETR
             ans.tokens = {"prompt": completion.prompt_tokens, "completion": completion.completion_tokens}
 
         # 2. extraction, garde-fous, exécution
-        sql, df, truncated, exec_s, error, kind = _try_once(completion.text)
+        r = _try_once(completion.text, backend=backend)
+        sql, error, kind = r["sql"], r["error"], r["kind"]
         ans.attempts.append(Attempt(sql, error, kind))
-        ans.sql, ans.error, ans.error_kind = sql, error, kind
+        ans.sql, ans.error, ans.error_kind, ans.cost = sql, error, kind, r["cost"]
         if error is None:
-            ans.df, ans.truncated = df, truncated
-            ans.timings["exec_s"] = exec_s
+            ans.df, ans.truncated = r["df"], r["truncated"]
+            ans.timings["exec_s"] = r["exec_s"]
+            if cache is not None and key:
+                cache.put(key, question, sql)
             break
+        if kind == "cout":
+            break  # une requête trop coûteuse n'est pas une erreur que le modèle sait corriger
 
         # 3. on renvoie l'erreur au modèle pour qu'il corrige
         messages += [
