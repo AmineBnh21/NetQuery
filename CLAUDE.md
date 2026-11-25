@@ -27,7 +27,11 @@ Projet portfolio d'un étudiant en M2 IA, orienté poste de Data Analyst / ingé
   `semantic/exemples.yaml`), `llm.py`, `sql_guard.py` (sqlglot + connexion DuckDB read_only,
   enable_external_access=false, lock_configuration, timeout par interrupt), `pipeline.py`, `app.py` (Streamlit).
   Tests : `python -m pytest` ; exemples : `python -m netquery.prompt --check`.
-- Prochaine étape : boucle d'auto-correction (étape 5), puis sélection des tables par RAG (étape 6).
+- Étape 5 faite : auto-correction dans `pipeline.ask` (2 essais max, `explain_error` indique la table
+  qui porte une colonne mal préfixée), reconnaissance des départements et régions (`prompt.resolve_places`).
+- Ollama installé (`%LOCALAPPDATA%\Programs\Ollama\ollama.exe`), modèle qwen2.5-coder:3b téléchargé.
+  Latence observée : 20 à 60 s par question sur CPU.
+- Prochaine étape : RAG (étape 6) : sélection des tables et exemples few-shot par similarité.
 
 ## Conventions
 

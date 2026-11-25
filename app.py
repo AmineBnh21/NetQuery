@@ -89,6 +89,12 @@ if question:
 
     if ans.sql:
         st.code(ans.sql, language="sql")
+    if ans.nb_corrections:
+        with st.expander(f"Requête corrigée automatiquement ({ans.nb_corrections} fois)"):
+            for i, a in enumerate(ans.attempts[:-1], 1):
+                st.markdown(f"**Essai {i}** : {a.error}")
+                if a.sql:
+                    st.code(a.sql, language="sql")
     t = ans.timings
     st.caption(
         f"Tables fournies au modèle : {', '.join(ans.prompt.tables)} · "

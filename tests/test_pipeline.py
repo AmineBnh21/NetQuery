@@ -11,13 +11,18 @@ pytestmark = pytest.mark.skipif(not DB_PATH.exists(), reason="base locale absent
 
 
 class FakeLLM:
-    def __init__(self, text):
-        self.text = text
+    """Renvoie les réponses dans l'ordre (la dernière est répétée)."""
+
+    def __init__(self, *texts):
+        self.texts = list(texts)
         self.messages = None
+        self.calls = 0
 
     def complete(self, messages, max_tokens=512):
-        self.messages = messages
-        return Completion(text=self.text, model="fake", latency_s=0.0)
+        self.messages = list(messages)
+        text = self.texts[min(self.calls, len(self.texts) - 1)]
+        self.calls += 1
+        return Completion(text=text, model="fake", latency_s=0.0)
 
 
 def test_extract_sql_bloc():
@@ -59,6 +64,29 @@ def test_erreur_execution():
 def test_pas_de_sql():
     ans = ask("question", llm=FakeLLM("Je ne sais pas."))
     assert ans.error_kind == "extraction"
+
+
+def test_auto_correction():
+    llm = FakeLLM("select nb from fact_indispo_site", "select count(*) as nb from fact_indispo_site")
+    ans = ask("Combien de sites en panne ?", llm=llm)
+    assert ans.ok and ans.nb_corrections == 1
+    # le modèle a reçu sa réponse fautive et le message d'erreur de DuckDB
+    assert llm.messages[-2]["role"] == "assistant"
+    assert "erreur d'exécution" in llm.messages[-1]["content"]
+
+
+def test_explication_colonne_mal_prefixee():
+    sql = "select d.operateur_id from fact_indispo_site f join dim_departement d using (departement)"
+    llm = FakeLLM(sql, "select f.operateur_id from fact_indispo_site f join dim_departement d using (departement)")
+    ans = ask("question", llm=llm)
+    assert ans.ok
+    assert "operateur_id se trouve dans : fact_indispo_site (alias f)" in llm.messages[-1]["content"]
+
+
+def test_auto_correction_limitee():
+    llm = FakeLLM("select nb from fact_indispo_site")
+    ans = ask("question", llm=llm, max_retries=2)
+    assert not ans.ok and llm.calls == 3 and ans.nb_corrections == 2
 
 
 def test_connexion_lecture_seule():

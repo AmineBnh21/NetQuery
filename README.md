@@ -197,6 +197,17 @@ streamlit run app.py
 python -m pytest
 ```
 
+Premiers résultats avec qwen2.5-coder:3b en local (CPU) : 5 questions sur 6 du jeu d'essai sont justes,
+pour 20 à 60 s par question. Deux mécanismes ont fait la différence :
+
+- **Reconnaissance des lieux** : les noms de départements et de régions de la question sont reconnus
+  (sans tenir compte des accents) et transmis au modèle avec leur code (« Nord » = `59`).
+- **Auto-correction guidée** : en cas d'erreur, la requête et le message de DuckDB sont renvoyés au modèle
+  (2 essais au maximum), avec une indication sur la table qui contient la colonne fautive.
+
+Limite connue : le modèle oublie parfois un regroupement demandé (« par opérateur ») quand un exemple
+proche ne l'a pas ; à traiter avec la sélection d'exemples (étape 6) et à mesurer à l'étape 8.
+
 Le schéma complet représente environ 1 900 tokens, deux tables environ 360 : avec un modèle local
 limité à 4 096 tokens de contexte, seules les tables utiles à la question sont envoyées.
 
@@ -212,7 +223,7 @@ python -c "import duckdb; print(duckdb.connect('data/netquery.duckdb').sql('SHOW
 - [x] **2. Staging et modèle** : typage, normalisation des opérateurs, passage au format long (service, techno, état), tables `dim_`, `fact_`, `agg_`.
 - [x] **3. Schéma enrichi** : description de chaque table et colonne, valeurs possibles, clés de jointure, colonnes de partition, glossaire métier (YAML).
 - [x] **4. MVP text-to-SQL** : prompt + génération + exécution sur DuckDB, interface Streamlit.
-- [ ] **5. Garde-fous** : validation sqlglot, lecture seule, `LIMIT`, timeout, boucle d'auto-correction.
+- [x] **5. Garde-fous** : validation sqlglot, lecture seule, `LIMIT`, timeout, boucle d'auto-correction.
 - [ ] **6. RAG** : sélection des tables pertinentes, exemples few-shot dynamiques.
 - [ ] **7. Cloud et coûts** : chargement dans BigQuery (partition par date, clustering par opérateur et département), dry run, seuil de coût, routage vers les tables `agg_`, cache du SQL normalisé, cache sémantique.
 - [ ] **8. Évaluation** : 60 à 80 questions avec le SQL attendu ; comparaison version naïve / version optimisée.

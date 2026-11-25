@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import re
 import sys
 from dataclasses import dataclass
 from functools import lru_cache
@@ -30,6 +31,10 @@ Règles :
 - Une seule requête SELECT (WITH autorisé). Jamais de INSERT, UPDATE, DELETE, CREATE.
 - Utilise uniquement les tables et colonnes listées. Respecte les valeurs exactes indiquées (ex. 'SFR', '4G').
 - Pour compter des sites sur plusieurs jours ou plusieurs technos : count(distinct site_id).
+- Si la question décrit l'état actuel (« sont », « ont », « actuellement », « depuis plus de N jours »)
+  sans donner de période, filtre sur le dernier relevé : date = (select max(date) from fact_indispo_site).
+- Fais tous les regroupements demandés (« par opérateur », « par trimestre »...) : une colonne et un GROUP BY pour chacun.
+- Utilise les correspondances de lieux fournies telles quelles (codes département).
 - Donne des noms de colonnes explicites en minuscules (ex. nb_sites).
 - Réponds uniquement par la requête dans un bloc ```sql```, sans explication."""
 
@@ -45,6 +50,60 @@ class Example:
 def load_examples(path: Path = SEMANTIC_DIR / "exemples.yaml") -> list[Example]:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     return [Example(e["question"], e["tables"], e["sql"].strip()) for e in data["exemples"]]
+
+
+# --------------------------------------------------------------------------- lieux cités dans la question
+
+# Noms de départements qui sont aussi des mots courants : reconnus seulement avec une majuscule
+# (« dans la Somme » oui, « la somme des sites » non).
+AMBIGUOUS_PLACES = {"somme", "lot", "manche", "cher", "nord", "var", "ain", "aube", "orne", "eure",
+                    "gard", "loire", "vienne", "indre", "oise", "marne", "gers", "aude", "tarn"}
+
+
+@dataclass
+class Place:
+    kind: str      # departement ou region
+    name: str
+    code: str      # code département, ou nom exact de la région
+
+    def hint(self) -> str:
+        if self.kind == "departement":
+            return f"{self.name} = département '{self.code}' (colonne departement = '{self.code}')"
+        return f"{self.name} = région (dim_departement.region = '{self.code}')"
+
+
+def _key(text: str) -> str:
+    return " " + re.sub(r"[^a-z0-9]+", " ", normalize(text)).strip() + " "
+
+
+@lru_cache(maxsize=1)
+def _place_index() -> list[tuple[str, Place]]:
+    from netquery.sql_guard import readonly_connection
+
+    try:
+        con = readonly_connection()
+        rows = con.execute("select departement, nom, region from dim_departement where nom is not null").fetchall()
+        con.close()
+    except Exception:  # base absente
+        return []
+    index = [(_key(nom), Place("departement", nom, dep)) for dep, nom, _ in rows]
+    index += [(_key(reg), Place("region", reg, reg)) for reg in {r for _, _, r in rows if r}]
+    # les noms les plus longs d'abord : « Auvergne-Rhône-Alpes » avant « Rhône »
+    return sorted(index, key=lambda x: -len(x[0]))
+
+
+def resolve_places(question: str) -> list[Place]:
+    q = _key(question)
+    found: list[Place] = []
+    for key, place in _place_index():
+        if key not in q:
+            continue
+        word = key.strip()
+        if word in AMBIGUOUS_PLACES and not re.search(rf"\b{re.escape(place.name)}\b", question):
+            continue
+        found.append(place)
+        q = q.replace(key, " # ")   # évite de reconnaître « Rhône » dans « Bouches-du-Rhône »
+    return found
 
 
 # --------------------------------------------------------------------------- choix des tables
@@ -124,12 +183,18 @@ def data_context(today: dt.date | None = None) -> str:
 
 def build_prompt(question: str, today: dt.date | None = None) -> Prompt:
     terms = glossary_for(question)
+    places = resolve_places(question)
+    if places and all(p.kind == "departement" for p in places):
+        # les faits portent déjà le code département : inutile d'envoyer dim_departement
+        terms = [t for t in terms if t.nom != "departement et region"]
     tables = select_tables(question, terms)
     examples = pick_examples(tables)
 
     parts = ["Schéma :", render_schema(tables)]
     if terms:
         parts += ["", "Glossaire :", render_glossary(terms)]
+    if places:
+        parts += ["", "Lieux reconnus dans la question :"] + [f"- {p.hint()}" for p in places]
     if examples:
         parts += ["", "Exemples :"]
         for ex in examples:
